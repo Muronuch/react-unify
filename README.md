@@ -49,33 +49,37 @@ With the skill installed, open Claude Code in any React project and say *"find d
 
 ## Demo
 
-Scanning a 287-component React frontend in 3 seconds:
+Run against the bundled sample fixture (8 components in 3 deliberate clusters):
 
 ```
-$ react-unify scan ./src
-✔ Found 287 components
+$ react-unify scan ./test/fixtures/sample-project
+✔ Found 8 components
 ✔ Fingerprinted
-✔ Found 20 cluster(s) (693 pair(s) blocked by rules)
-Scanned 287 components
-Found 20 cluster(s) — 0 mergeable
+✔ Found 3 cluster(s)
+Scanned 8 components
+Found 3 cluster(s) — 0 mergeable
 Report written to ./react-unify-report.md
 (re-run with --propose for LLM-generated unified-component proposals)
 ```
 
-Snippet from the report:
+A snippet from the report:
 
 ```markdown
-## Cluster 1 — confidence: high (similarity 0.93)
+## Cluster 1 — confidence: high (similarity 1.00)
 
 **Components:**
-- [`APIDomainDeleteDrawer`](src/modules/api/domain/DeleteDrawer.tsx#L19-L97) — 79 lines L19-97
-- [`HRPDPSpecialtyDeleteDrawer`](src/modules/hr/pdp/specialty/SpecialtyDeleteDrawer.tsx#L16-L74) — 59 lines L16-74
-- [`HRPDPGoalDeleteDrawer`](src/modules/hr/pdp/goal/DeleteDrawer.tsx#L16-L70) — 55 lines L16-70
-- [`HRPDPCompetencyDeleteDrawer`](src/modules/hr/pdp/competency/CompetencyDeleteDrawer.tsx#L16-L74) — 59 lines L16-74
-- ...7 more delete drawers across HR, OKR, API, Settings modules
+- [`UserCard`](src/components/UserCard.tsx#L9-L21) — 21 lines L9-21
+- [`ProductCard`](src/components/ProductCard.tsx#L9-L21) — 21 lines L9-21
+- [`TeamCard`](src/components/TeamCard.tsx#L9-L21) — 21 lines L9-21
+
+## Cluster 2 — confidence: high (similarity 0.90)
+
+**Components:**
+- [`UserList`](src/components/UserList.tsx#L7-L20) — 14 lines L7-20
+- [`ProductList`](src/components/ProductList.tsx#L7-L20) — 14 lines L7-20
 ```
 
-Links are clickable in VSCode's markdown preview — Ctrl+click jumps to the component's line range.
+Links are clickable in VSCode's markdown preview — Ctrl+click jumps to the component's line range. Scaling this up to a real codebase is the same command pointed at your `./src`.
 
 ## Usage
 
