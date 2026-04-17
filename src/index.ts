@@ -11,6 +11,7 @@ import { clusterComponents } from "./clusterer/cluster.js";
 import { buildReport, renderMarkdown, renderJson, renderConsoleSummary } from "./reporter/report.js";
 import { loadConfig } from "./utils/config.js";
 import { writeText } from "./utils/fs.js";
+import { loadRules, filterDescriptors, computeBlockedPairs } from "./utils/rules.js";
 
 export function hello(): string {
   return "react-unify";
@@ -37,6 +38,8 @@ program
   .option("--max-clusters <number>", "max clusters to process", (v) => parseInt(v, 10), 20)
   .option("--min-cluster-size <number>", "min cluster size", (v) => parseInt(v, 10), 2)
   .option("--max-cluster-size <number>", "max cluster size (prevents runaway merges)", (v) => parseInt(v, 10), 8)
+  .option("--config <path>", "path to .react-unify.json (auto-discovered by default)")
+  .option("--no-config", "skip auto-discovery of .react-unify.json rules")
   .action(async (directory: string, options: Record<string, unknown>) => {
     const config = loadConfig({
       target_dir: path.resolve(directory),
@@ -59,9 +62,27 @@ program
       process.exit(1);
     }
 
+    const useConfig = options["config"] !== false;
+    const configPath = typeof options["config"] === "string" ? (options["config"] as string) : undefined;
+    let loadedRules: ReturnType<typeof loadRules> = null;
+    if (useConfig) {
+      try {
+        loadedRules = loadRules(config.target_dir, configPath);
+      } catch (e) {
+        console.error(chalk.red((e as Error).message));
+        process.exit(1);
+      }
+    }
+    if (loadedRules) {
+      console.log(chalk.gray(`Using rules from ${loadedRules.filePath}`));
+    }
+
     const scanSpinner = ora("Scanning components…").start();
-    const descriptors = extractComponents(config.target_dir);
-    scanSpinner.succeed(chalk.green(`Found ${descriptors.length} components`));
+    const rawDescriptors = extractComponents(config.target_dir);
+    const descriptors = filterDescriptors(rawDescriptors, loadedRules?.rules ?? null);
+    const filteredOutCount = rawDescriptors.length - descriptors.length;
+    const filteredSuffix = filteredOutCount > 0 ? ` (${filteredOutCount} excluded by rules)` : "";
+    scanSpinner.succeed(chalk.green(`Found ${descriptors.length} components${filteredSuffix}`));
 
     if (descriptors.length === 0) {
       console.error(chalk.yellow("Warning: no .tsx/.jsx components found in the target directory. Is the path correct?"));
@@ -77,10 +98,17 @@ program
     fpSpinner.succeed(chalk.green("Fingerprinted"));
 
     const clSpinner = ora("Finding similar components…").start();
-    const clusters = clusterComponents(fingerprints, config.similarity_threshold, config.max_cluster_size)
+    const blockedPairs = computeBlockedPairs(fingerprints, loadedRules?.rules ?? null);
+    const clusters = clusterComponents(
+      fingerprints,
+      config.similarity_threshold,
+      config.max_cluster_size,
+      blockedPairs
+    )
       .filter((c) => c.components.length >= config.min_cluster_size)
       .slice(0, config.max_clusters);
-    clSpinner.succeed(chalk.green(`Found ${clusters.length} cluster(s)`));
+    const blockSuffix = blockedPairs.size > 0 ? ` (${blockedPairs.size} pair(s) blocked by rules)` : "";
+    clSpinner.succeed(chalk.green(`Found ${clusters.length} cluster(s)${blockSuffix}`));
 
     if (config.dry_run && options["dryRun"] !== true && config.api_key === null) {
       console.error(chalk.yellow("No ANTHROPIC_API_KEY found — running in --dry-run mode (no LLM calls)"));

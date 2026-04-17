@@ -59,7 +59,8 @@ export function similarity(a: ComponentFingerprint, b: ComponentFingerprint): nu
 export function clusterComponents(
   fps: ComponentFingerprint[],
   threshold = 0.6,
-  maxClusterSize = Infinity
+  maxClusterSize = Infinity,
+  blockedPairs?: Set<string>
 ): ComponentCluster[] {
   if (fps.length < 2) return [];
 
@@ -82,6 +83,17 @@ export function clusterComponents(
     return count === 0 ? 0 : sum / count;
   }
 
+  function hasBlockedPair(a: number[], b: number[]): boolean {
+    if (!blockedPairs || blockedPairs.size === 0) return false;
+    for (const x of a) {
+      for (const y of b) {
+        const key = x < y ? `${x}|${y}` : `${y}|${x}`;
+        if (blockedPairs.has(key)) return true;
+      }
+    }
+    return false;
+  }
+
   while (true) {
     let bestI = -1;
     let bestJ = -1;
@@ -89,6 +101,7 @@ export function clusterComponents(
     for (let i = 0; i < clusters.length; i++) {
       for (let j = i + 1; j < clusters.length; j++) {
         if (clusters[i]!.length + clusters[j]!.length > maxClusterSize) continue;
+        if (hasBlockedPair(clusters[i]!, clusters[j]!)) continue;
         const s = avgLink(clusters[i]!, clusters[j]!);
         if (s > bestS) { bestS = s; bestI = i; bestJ = j; }
       }

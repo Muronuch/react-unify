@@ -64,6 +64,8 @@ react-unify scan <directory> [options]
 | `--max-clusters <n>` | `20` | Max clusters to process |
 | `--min-cluster-size <n>` | `2` | Min components per cluster |
 | `--max-cluster-size <n>` | `8` | Max components per cluster (prevents runaway merges) |
+| `--config <path>` | auto-discover | Path to a `.react-unify.json` rules file |
+| `--no-config` | off | Skip auto-discovery of `.react-unify.json` |
 
 ### Environment
 
@@ -102,6 +104,45 @@ A "probably not worth merging" cluster:
 - Low confidence / <0.7 similarity
 - Members span different categories
 - Structural differences large enough that a generic component would need heavy conditional logic
+
+## Rules: `.react-unify.json`
+
+Drop a `.react-unify.json` at your project root to tell `react-unify` which components or patterns to skip. The tool walks up from the scan directory to find it; override with `--config <path>`, disable with `--no-config`.
+
+```json
+{
+  "exclude": {
+    "paths": ["**/*.test.tsx", "**/generated/**"],
+    "components": ["LegacyButton", "DeprecatedModal"]
+  },
+  "neverClusterTogether": [
+    {
+      "description": "Create/Update drawers follow distinct validation paths (team standard)",
+      "patterns": ["Create.*Drawer", "Update.*Drawer"]
+    },
+    {
+      "description": "Desktop and Mobile variants are intentional viewport branches",
+      "patterns": [".*Desktop$", ".*Mobile$"]
+    }
+  ]
+}
+```
+
+**`exclude.paths`** — glob patterns (supports `*`, `**`, `?`). Components whose file paths match any pattern are dropped before clustering.
+
+**`exclude.components`** — exact component names to drop (simple allowlist-by-name).
+
+**`neverClusterTogether`** — each rule has a `description` (free text, for your future self) and a `patterns` array of 2+ JavaScript regexes. Patterns partition components into families; any pair whose families are disjoint within the rule can never end up in the same cluster. Patterns are case-insensitive; `(?i)` prefix is stripped.
+
+### Editing rules via Claude Code
+
+If you installed the Claude Code skill ([see Install section](#claude-code-integration-recommended)), you can manage rules conversationally:
+
+- *"Cluster 2 should always be separate — team standard"* → Claude Code proposes a `neverClusterTogether` rule, shows the JSON, stages the change, and asks before committing.
+- *"Ignore cluster 5 for now"* → Claude Code drops it from this session's summary only; no file change.
+- *"Never flag these in any project"* → Claude Code saves a personal preference to its memory, applies it next time you run the skill in any repo.
+
+You never have to remember the JSON schema.
 
 ## Tuning the threshold
 
