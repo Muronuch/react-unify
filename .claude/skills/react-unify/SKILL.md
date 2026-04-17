@@ -1,86 +1,99 @@
 ---
 name: react-unify
-description: Use when the user asks to find duplicate, similar, or copy-pasted React components; identify refactoring targets; reduce component count; or merge structurally similar UI components into a single generic component. Runs the react-unify CLI to produce a cluster report and helps the user manage exclusion rules conversationally.
+description: Use when the user asks to find duplicate, similar, or copy-pasted React components; identify refactoring targets; reduce component count; or merge structurally similar UI components into a single generic component. Runs the react-unify CLI to produce a cluster report; helps the user manage exclusion rules and merge clusters either using Claude Code natively or via the optional --propose LLM step.
 ---
 
 # react-unify
 
-Finds structurally similar React/TypeScript components in a codebase, clusters them by shape, and (with an Anthropic API key) proposes LLM-generated unified components that compile via `tsc`.
+A CLI that scans React/TypeScript codebases for structurally similar components and writes a markdown cluster report with clickable source links. The tool's primary job is **scan + cluster + report** — fast, no API key, no LLM. There is also an opt-in `--propose` mode that calls an LLM to draft a unified component, but for most workflows the better merge path is to let Claude Code (you) write the unified component using the project's full context.
 
 ## When to invoke this skill
 
-Trigger on requests like:
+Trigger on:
 - "find duplicate components"
-- "which components are similar?"
-- "what can I deduplicate in this React app?"
-- "scan for components that could be merged"
-- "refactoring opportunities in the frontend"
+- "what can I deduplicate?"
+- "scan for refactoring opportunities"
+- "merge similar components"
 - "reduce component count"
+- Plus rule-management follow-ups: "always keep X separate", "ignore Y", "don't flag Z"
 
-Also trigger when the user reacts to a previous scan result with a rule-management intent: *"always keep X separate"*, *"ignore Y"*, *"don't flag Z anymore"* — route those to the "managing exclusion rules" section below.
-
-Skip if: the codebase is not React/TypeScript, or the user is asking about a single specific component rather than repo-wide patterns.
+Skip if: the codebase is not React/TypeScript, or the user is asking about a single component (not repo-wide patterns).
 
 ## Preflight
-
-Before running, check the CLI is installed:
 
 ```bash
 command -v react-unify
 ```
 
-If not found, tell the user:
-> "`react-unify` isn't installed on this machine. To install it: clone the repo, then `cd react-unify && npm install && npm run build && npm link`. Point me at the repo if you have it locally, or I can help you set it up."
+If not found:
+> "`react-unify` isn't installed. Clone the repo, then `cd react-unify && npm install && npm run build && npm link`."
 
-Then stop. Don't try to run the tool.
+Then stop.
 
-## Running the scan
-
-Default invocation (dry-run first — no API cost, no LLM calls, finishes in seconds):
+## Default flow: scan-only
 
 ```bash
-react-unify scan <path-to-src> --dry-run -o /tmp/react-unify-report.md
+react-unify scan <path-to-src> -o /tmp/react-unify-report.md
 ```
 
-Always write the report to a predictable location you can read afterward. `/tmp/react-unify-report.md` works on Unix/Windows-bash.
+Pick the path: prefer `./src`; fall back to `./app`, `./apps/*/src`, etc. Don't scan repo root.
 
-**Pick the scan path carefully.** Prefer `./src`; fall back to `./app`, `./apps/*/src`, or the closest equivalent. Don't scan the repo root.
+The tool auto-discovers `.react-unify.json` walking up from the scan dir; if found, it'll log `Using rules from <path>`. Mention it.
 
-The tool auto-discovers `.react-unify.json` by walking up from the scan directory. When it's found, you'll see `Using rules from <path>` in the output — mention this to the user so they know rules were applied.
+### Threshold tuning
 
-### Threshold selection
+Default 0.75 fits most projects. Adjust:
+- 25+ clusters or several at the 8-cap → `--threshold 0.85`
+- <5 clusters on a visibly large codebase → `--threshold 0.65`
 
-The default threshold (0.75) is calibrated for small-to-medium codebases. Adjust on the fly:
+One rerun max. If the tool isn't finding clusters at sane thresholds, the codebase doesn't have much duplication and that's the answer.
 
-- If the scan finds **more than ~25 clusters** or any **very large clusters** (8-sized at the cap): raise to `--threshold 0.85`. Large codebases over-merge.
-- If it finds **fewer than ~5 clusters** on a visibly large codebase: lower to `--threshold 0.65` and retry.
-- One rerun at a different threshold is fine. Don't iterate more than twice.
+## Reading the report
 
-### With an API key (full pipeline)
+Read `/tmp/react-unify-report.md`. Summarize for the user:
 
-If `ANTHROPIC_API_KEY` is set and the user wants actual proposals (not just clusters), drop `--dry-run`:
+1. **Headline**: "Scanned N components, found M cluster(s)." Mention rule-filtering if any: "(X excluded, Y pairs blocked per `.react-unify.json`)".
+2. **Top 3–5 clusters** by similarity. For each:
+   - Cluster theme if obvious ("Delete drawers across 7 entity types", "Desktop/Mobile dropdown variants")
+   - Member count and total lines
+   - Recommendation: "Strong merge candidate" / "Worth reviewing" / "Borderline"
+3. **Mention the report path** — `file:///` links are clickable in VSCode.
 
+Don't dump the raw cluster list into chat. Summarize.
+
+## Merging a cluster: two paths
+
+When the user picks a cluster and wants to merge it, **offer both paths and let them choose**:
+
+**Path A — Claude Code writes the merge (recommended for most cases)**
+- You read the cluster's component sources (line ranges in the report make this easy)
+- You design the unified component using the project's actual conventions, sibling files, type aliases, etc.
+- You write `src/components/unified/<Name>.tsx` (or whatever path makes sense for the layout)
+- You rewrite each original file as a thin wrapper that re-exports the same name
+- You run `tsc --noEmit` and any test suite the project has
+- You iterate on errors
+- You show the diff and commit on user confirmation
+
+This uses your full context, can ask clarifying questions, and iterates on type errors.
+
+**Path B — `react-unify --propose` (optional)**
 ```bash
-react-unify scan <path> -o /tmp/react-unify-report.md
+react-unify scan <path> --propose -o /tmp/react-unify-report.md
 ```
 
-This takes minutes. Set expectations before running.
+Calls the configured LLM (Anthropic by default), generates a unified component + thin-wrapper rewrites for each cluster, optionally runs `tsc --noEmit` against a temp copy. Requires `ANTHROPIC_API_KEY`.
 
-## Reading and summarizing the report
+When this is useful:
+- The user wants a reproducible artifact in the report (the proposal lives in the markdown)
+- The user prefers a one-shot LLM call without running a longer Claude Code session
+- The user wants the verifier's pass/fail signal as part of the report
 
-Read `/tmp/react-unify-report.md`. For the user, summarize in this order:
+When to skip Path B: if you (Claude Code) have full context on this codebase, Path A produces better results because it iterates and uses real project setup.
 
-1. **Headline**: "Scanned N components, found M cluster(s) of near-duplicates." Mention if rules filtered anything: "(X components excluded, Y pairs blocked per `.react-unify.json` rules)".
-2. **Top 3–5 clusters** (highest similarity, ideally high confidence). For each:
-   - Cluster theme if obvious (e.g. "Delete drawers across 7 entity types", "3 dashboard layouts", "Desktop/Mobile variants of the same dropdown")
-   - Number of members and total line count
-   - One-line recommendation: "Strong merge candidate" / "Worth reviewing" / "Borderline"
-3. **Total potential savings** if proposals were generated.
-4. **Mention the report path** so the user can open it — `file:///` links in it are clickable in VSCode.
+Say something like:
+> "Want me to write the unified component myself (uses my session context, iterates on errors), or run `react-unify --propose` to get an LLM-generated proposal embedded in the report?"
 
-Do NOT dump the raw cluster list into chat. Summarize.
-
-## Managing exclusion rules (conversational)
+## Managing exclusion rules
 
 `.react-unify.json` at the project root holds per-repo rules. Format:
 
@@ -99,82 +112,50 @@ Do NOT dump the raw cluster list into chat. Summarize.
 }
 ```
 
-Rules apply in two places:
-- `exclude.paths` and `exclude.components` filter components during the scan.
-- `neverClusterTogether` blocks pairs of components whose names match different patterns in the same rule from ever ending up in the same cluster.
-
-### When the user rejects a cluster
-
-Route based on their phrasing:
+### Routing rejections
 
 | User says | Action |
 |---|---|
 | "yes" / "merge these" / accepts | No rule change |
-| "ignore cluster N" / "skip this one" | Stay in session memory only, don't touch `.react-unify.json` |
-| "keep separate" / "no, these are different" (ambiguous) | Ask: "One-off for this scan, or a permanent repo rule?" and proceed accordingly |
-| "always separate" / "team standard" / "by design" / "never merge X and Y" | Propose a `neverClusterTogether` rule; see below |
-| "I never want to merge X in any project" / "remember this across projects" | Save as Claude memory (feedback type); see below |
+| "ignore cluster N" / "skip this one" | Session-only, no file change |
+| "keep separate" (ambiguous) | Ask: "One-off, or permanent repo rule?" |
+| "always separate" / "team standard" / "by design" / "never merge X and Y" | Propose `neverClusterTogether` rule, show JSON, stage with `git add`, ask before commit |
+| "I never want to merge X in any project" / "remember across projects" | Save as Claude `feedback` memory; confirm |
 
-### Writing a repo rule
+### Proactive suggestions
 
-When a repo rule is warranted, propose the exact JSON you'd add and show the user before writing:
-
-> "I'll add this to `.react-unify.json`:
-> ```json
-> {
->   "description": "Create/Update drawers kept separate per team standard (2026-04-17)",
->   "patterns": ["Create.*Drawer", "Update.*Drawer"]
-> }
-> ```
-> Add and stage for commit? (y/n)"
-
-If `.react-unify.json` doesn't exist yet, create it at the project root with just this rule inside `neverClusterTogether`. If it exists, append.
-
-After writing, **stage with `git add` but do NOT commit automatically**. Show the user the diff (`git diff --cached .react-unify.json`) and ask if they want to commit. Let them name the commit or accept a suggested message like `chore: react-unify rule — keep Create/Update drawers separate`.
-
-### Proactive rule suggestions
-
-If a cluster's members cleanly fit one of these well-known families, proactively propose a rule instead of waiting for the user to object:
+If a cluster cleanly fits one of these well-known families, propose a rule **before** the user objects:
 
 - **Create / Update / Delete drawers or dialogs** — almost always intentionally separate in CRUD apps
 - **Desktop / Mobile variants** (`*Desktop` vs `*Mobile`) — usually intentional viewport branches
-- **Component + Component\*Test** — tests shouldn't cluster with their implementations (usually filtered by `exclude.paths` instead)
 
-When the user confirms, write the rule. When they reject, respect that and drop it.
+Show the JSON, ask, write on confirm.
 
-### Regex rules
+### Writing rules
 
-Patterns compile to case-insensitive JavaScript regex. `(?i)` prefix is stripped automatically so Python/Go-style patterns work. Always show the patterns to the user before writing — regex errors are on the author.
+Show the proposed JSON before writing. Use a `description` field that captures the user's stated reason and includes today's date. After writing:
+```bash
+git add .react-unify.json
+git diff --cached .react-unify.json
+```
+Show the diff. Ask before committing. Suggest a commit message like `chore: react-unify rule — keep Create/Update drawers separate` but let the user override.
 
-### Writing a Claude memory (cross-project preference)
+### Cross-project memory
 
-ONLY when the user explicitly says "remember this across projects", "always, everywhere", "I personally never...", or a similar global scope marker. Never save to memory for one-off or per-repo preferences.
-
-Save as a `feedback` memory under the user's Claude memory directory with a clear name (e.g. `feedback_react_unify_never_merge_dropdowns.md`). Include **Why** (user stated reason) and **How to apply** (when react-unify runs in any project, check if the pattern applies and proactively propose a repo rule for that project).
-
-Confirm the memory was written.
+ONLY when the user explicitly says "remember across projects", "in any project", "everywhere". Save as a Claude `feedback` memory with **Why** (their reason) and **How to apply** (when react-unify runs in any project, suggest the matching repo rule).
 
 ## Verifying a cluster is real
 
-When a cluster looks interesting but you're unsure, spot-check by reading 2-3 of its members and diffing them. A genuine duplication cluster will differ mostly in:
-- Entity/domain name in identifiers (UserCard vs ProductCard)
+Spot-check by reading 2–3 members and diffing. A genuine duplication cluster differs in:
+- Entity/domain name in identifiers
 - API endpoints
 - i18n keys
-- Tailwind/CSS class strings
+- CSS classes
 
-…not in JSX structure, hook usage, or control flow. If JSX structure differs meaningfully, flag the cluster as borderline.
+…not in JSX structure, hook usage, or control flow. If structure differs, flag as borderline.
 
-## Common follow-up work
+## Known limitations
 
-After summarizing, offer next steps based on what was found:
-
-- **"Want me to write a unified component for cluster N?"** — manually implement a generic for one specific high-value cluster, with the originals rewritten as thin wrappers.
-- **"Want to rerun with the LLM proposer?"** — requires `ANTHROPIC_API_KEY`.
-- **"Want to rerun at a different threshold?"** — if initial results were too broad or too narrow.
-- **"Want to add a repo rule for this pattern?"** — when user dismisses clusters that match a well-known family.
-
-## Known limitations to mention if relevant
-
-- Only the `anthropic` LLM provider is implemented.
-- The verifier uses `react-unify`'s own TypeScript install, not the target project's. Use `--no-verify` for projects with unusual type dependencies.
-- The tool is read-only against the target project — it never modifies source files. Applying a merge is manual.
+- Only the `anthropic` LLM provider is implemented for `--propose`.
+- The `--propose` verifier uses `react-unify`'s own TypeScript install, not the target project's. For projects with unusual type packages, use `--no-verify` or just go with Path A (Claude Code merges).
+- The tool is read-only against the target project — never modifies source files. All merges (Path A or Path B) require manual application.

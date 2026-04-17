@@ -122,22 +122,10 @@ export function renderMarkdown(r: Report): string {
       lines.push(c.proposal.generic_source);
       lines.push("```");
       lines.push("");
-      lines.push("**Rewrites:**");
-      lines.push("");
-      for (const rw of c.proposal.rewrites) {
-        lines.push(`*${rw.original}*:`);
-        lines.push("");
-        lines.push("```tsx");
-        lines.push(rw.rewrite);
-        lines.push("```");
-        lines.push("");
-      }
-      lines.push(`**Savings:** ${c.proposal.lines_saved} lines`);
+      lines.push(`**Savings:** ${c.proposal.lines_saved} lines · rewrites the ${c.proposal.rewrites.length} components above as thin wrappers`);
       lines.push("");
       if (c.verified) lines.push("✅ Verified (compiles)");
       else lines.push(`⚠️ Not verified${c.verification_errors.length ? ": " + c.verification_errors[0] : ""}`);
-    } else {
-      lines.push("_No proposal generated for this cluster._");
     }
     lines.push("");
     lines.push("---");

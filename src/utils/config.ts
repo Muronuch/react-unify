@@ -11,7 +11,7 @@ export interface Config {
   similarity_threshold: number;
   verify: boolean;
   run_tests: boolean;
-  dry_run: boolean;
+  propose: boolean;
   verbose: boolean;
   max_clusters: number;
   min_cluster_size: number;
@@ -26,7 +26,7 @@ export interface ConfigOverrides {
   noTests?: boolean;
   provider?: LLMProvider;
   model?: string;
-  dryRun?: boolean;
+  propose?: boolean;
   verbose?: boolean;
   threshold?: number;
   maxClusters?: number;
@@ -55,7 +55,7 @@ export function loadConfig(overrides: ConfigOverrides, env: NodeJS.ProcessEnv = 
     similarity_threshold: overrides.threshold ?? 0.75,
     verify: overrides.noVerify !== true,
     run_tests: overrides.noTests !== true,
-    dry_run: overrides.dryRun === true || api_key === null,
+    propose: overrides.propose === true,
     verbose: overrides.verbose === true,
     max_clusters: overrides.maxClusters ?? 20,
     min_cluster_size: overrides.minClusterSize ?? 2,

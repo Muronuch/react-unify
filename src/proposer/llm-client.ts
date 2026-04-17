@@ -21,7 +21,7 @@ export class AnthropicClient implements LLMClient {
     const resp = await this.client.messages.create(
       {
         model: req.model ?? this.defaultModel,
-        max_tokens: req.max_tokens ?? 4096,
+        max_tokens: req.max_tokens ?? 8192,
         messages: [{ role: "user", content: req.prompt }],
       },
       { timeout: 60_000 }

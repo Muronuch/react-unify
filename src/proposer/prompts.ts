@@ -28,8 +28,9 @@ ${src}
 4. Use discriminated unions or conditional props where behavior differs significantly.
 5. The generic component should use the same hooks and patterns as the originals.
 6. Name it descriptively (e.g. if merging UserCard, ProductCard, TeamCard → ItemCard).
-7. Include JSDoc comments on the props interface explaining each prop.
+7. Do NOT add JSDoc, prop-explaining comments, or section dividers. Identifiers should be self-documenting. Only add a comment when explaining a non-obvious constraint or invariant in the implementation.
 8. Each REWRITE block must be a thin wrapper that keeps the original component's name and file location, so callers do not need to change imports.
+9. Output as little code as possible while satisfying the above. No example usage, no preamble, no JSDoc.
 
 ## Original Components
 

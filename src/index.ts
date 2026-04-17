@@ -20,20 +20,20 @@ export function hello(): string {
 const program = new Command();
 program
   .name("react-unify")
-  .description("Find and merge duplicate React components using AI")
+  .description("Find structurally similar React components and write a clickable cluster report")
   .version("0.1.0");
 
 program
   .command("scan <directory>")
-  .description("Scan a React project for mergeable components")
+  .description("Scan a React project for clusters of similar components")
   .option("-t, --threshold <number>", "similarity threshold 0-1", (v) => parseFloat(v), 0.75)
   .option("-o, --output <path>", "output report path")
   .option("--json", "emit JSON instead of markdown")
-  .option("--no-verify", "skip TypeScript compilation verification")
-  .option("--no-tests", "skip test verification")
-  .option("--provider <name>", "anthropic|openai|deepseek", "anthropic")
-  .option("--model <name>", "LLM model name")
-  .option("--dry-run", "scan and cluster only, no LLM proposals")
+  .option("--propose", "(opt-in) generate LLM-based unified-component proposals + tsc verification")
+  .option("--no-verify", "with --propose: skip TypeScript compilation verification")
+  .option("--no-tests", "with --propose: skip test verification")
+  .option("--provider <name>", "with --propose: anthropic|openai|deepseek", "anthropic")
+  .option("--model <name>", "with --propose: LLM model name")
   .option("--verbose", "verbose progress output")
   .option("--max-clusters <number>", "max clusters to process", (v) => parseInt(v, 10), 20)
   .option("--min-cluster-size <number>", "min cluster size", (v) => parseInt(v, 10), 2)
@@ -49,7 +49,7 @@ program
       noTests: options["tests"] === false,
       provider: options["provider"] as never,
       model: options["model"] as string | undefined,
-      dryRun: options["dryRun"] as boolean | undefined,
+      propose: options["propose"] as boolean | undefined,
       verbose: options["verbose"] as boolean | undefined,
       threshold: options["threshold"] as number | undefined,
       maxClusters: options["maxClusters"] as number | undefined,
@@ -110,30 +110,39 @@ program
     const blockSuffix = blockedPairs.size > 0 ? ` (${blockedPairs.size} pair(s) blocked by rules)` : "";
     clSpinner.succeed(chalk.green(`Found ${clusters.length} cluster(s)${blockSuffix}`));
 
-    if (config.dry_run && options["dryRun"] !== true && config.api_key === null) {
-      console.error(chalk.yellow("No ANTHROPIC_API_KEY found — running in --dry-run mode (no LLM calls)"));
-    }
-
-    if (config.dry_run) {
+    if (!config.propose) {
       const report = buildReport({ scanned_count: descriptors.length, clusters, descriptors, proposals: new Map() });
       const out = config.output_format === "json" ? renderJson(report) : renderMarkdown(report);
       writeText(config.output_path, out);
       console.log(chalk.cyan(renderConsoleSummary(report)));
       console.log(chalk.gray(`Report written to ${config.output_path}`));
+      console.log(chalk.gray(`(re-run with --propose for LLM-generated unified-component proposals)`));
       return;
+    }
+
+    if (!config.api_key) {
+      console.error(chalk.red(`--propose requires an API key. Set ANTHROPIC_API_KEY (or use the provider's env var).`));
+      process.exit(1);
     }
 
     const { createClient } = await import("./proposer/llm-client.js");
     const { proposeUnification, toSlim } = await import("./proposer/propose.js");
-    const llm = createClient(config.llm_provider, config.api_key!, config.llm_model);
+    const llm = createClient(config.llm_provider, config.api_key, config.llm_model);
 
     const proposals = new Map<number, { proposal: ReturnType<typeof toSlim> | null; verified: boolean; verification_errors: string[] }>();
     for (const cluster of clusters) {
       const sp = ora(`Proposing unified component for cluster ${cluster.id}…`).start();
-      const proposal = await proposeUnification(cluster, descriptors, llm, { maxRetries: config.max_retries, model: config.llm_model });
+      let lastError = "";
+      const proposal = await proposeUnification(cluster, descriptors, llm, {
+        maxRetries: config.max_retries,
+        model: config.llm_model,
+        onAttemptError: (_attempt, error) => { lastError = error; },
+      });
       if (!proposal) {
-        sp.warn(chalk.yellow(`Cluster ${cluster.id}: LLM did not return a usable proposal`));
-        proposals.set(cluster.id, { proposal: null, verified: false, verification_errors: ["LLM proposal failed"] });
+        const short = lastError.length > 200 ? lastError.slice(0, 200) + "…" : lastError;
+        const detail = short ? `: ${short}` : "";
+        sp.warn(chalk.yellow(`Cluster ${cluster.id}: LLM did not return a usable proposal${detail}`));
+        proposals.set(cluster.id, { proposal: null, verified: false, verification_errors: [lastError || "LLM proposal failed"] });
         continue;
       }
       sp.succeed(chalk.green(`Cluster ${cluster.id}: ${proposal.generic_component.name} (saves ${proposal.savings} lines)`));

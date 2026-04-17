@@ -1,6 +1,8 @@
 # react-unify
 
-A CLI that scans a React/TypeScript codebase, finds structurally similar components, and uses an LLM to propose a single generic component that replaces them. Verifies the proposal compiles and reports proposed line savings.
+A CLI that scans a React/TypeScript codebase, finds structurally similar components by AST shape, and writes a markdown cluster report with clickable `file:///` source links. Designed to pair with Claude Code (or any human reviewer) — the tool surfaces the duplication; you (or Claude Code) decide what to merge.
+
+Optional `--propose` flag adds an LLM step that drafts a unified component per cluster and verifies it compiles via `tsc`. Off by default; you don't need an API key for the core workflow.
 
 ## Install
 
@@ -55,33 +57,34 @@ react-unify scan <directory> [options]
 | `-t, --threshold <0..1>` | `0.75` | Similarity threshold for clustering |
 | `-o, --output <path>` | `react-unify-report.md` | Report output path |
 | `--json` | off | Emit JSON instead of markdown |
-| `--no-verify` | off | Skip TypeScript compilation verification |
-| `--no-tests` | off | Skip test verification |
-| `--provider <name>` | `anthropic` | `anthropic` (only one implemented in v1) |
-| `--model <name>` | `claude-sonnet-4-6` | LLM model |
-| `--dry-run` | off | Scan and cluster only, no LLM |
 | `--verbose` | off | Verbose output |
 | `--max-clusters <n>` | `20` | Max clusters to process |
 | `--min-cluster-size <n>` | `2` | Min components per cluster |
 | `--max-cluster-size <n>` | `8` | Max components per cluster (prevents runaway merges) |
 | `--config <path>` | auto-discover | Path to a `.react-unify.json` rules file |
 | `--no-config` | off | Skip auto-discovery of `.react-unify.json` |
+| **Opt-in LLM proposer** | | |
+| `--propose` | off | Generate LLM-drafted unified components + tsc verification per cluster |
+| `--no-verify` | off | With `--propose`: skip TypeScript compilation verification |
+| `--no-tests` | off | With `--propose`: skip test verification |
+| `--provider <name>` | `anthropic` | With `--propose`: only `anthropic` implemented in v1 |
+| `--model <name>` | `claude-sonnet-4-6` | With `--propose`: LLM model |
 
-### Environment
+### Environment (only needed for `--propose`)
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-If no key is set, `react-unify` automatically runs in `--dry-run` mode (clustering only, no LLM proposals or verification).
+The default scan-only mode never calls an LLM — no key required. Set the variable only if you plan to use `--propose`.
 
 ## Recommended first run
 
 ```bash
-react-unify scan ./src --dry-run
+react-unify scan ./src
 ```
 
-This surfaces clusters in ~seconds with no API cost. Inspect `react-unify-report.md` and decide which clusters look worth unifying. Then rerun without `--dry-run` (with an API key set) to get actual generic-component proposals + `tsc` verification.
+Surfaces clusters in seconds. No API key, no cost. Inspect `react-unify-report.md` and decide what to merge — either by hand, by pairing with Claude Code (recommended; see the skill below), or by re-running with `--propose` to get LLM-drafted starting points embedded in the report.
 
 Add `react-unify-report.*` to your project's `.gitignore` so scan artefacts don't get committed.
 
@@ -92,8 +95,8 @@ The report is grouped by cluster. Each cluster entry includes:
 - **Confidence** (`high` / `medium` / `low`) — from the `similarity_score` (≥0.8 with same category = high; ≥0.65 = medium; else low)
 - **Similarity** — weighted average of Jaccard overlaps on hooks, JSX tags, prop types, structural flags, and JSX depth closeness
 - **Components** — clickable `file:///`-URI links (Ctrl+click in VSCode jumps to the component's line range in the source file)
-- **Proposal** (non-dry-run only) — a generic component + per-original thin-wrapper rewrites preserving the original names and file paths, so callers don't need to change imports
-- **Verification** — ✅ if the proposal compiles in a temp copy of the target project via `tsc --noEmit`
+- **Proposal** (only with `--propose`) — a generic component the LLM drafted to replace the cluster; the line-range links above tell you which originals it would replace
+- **Verification** (only with `--propose`) — ✅ if the proposal compiles in a temp copy of the target project via `tsc --noEmit`
 
 A "good" candidate cluster typically looks like:
 - 2–8 members in the same category (cards, forms, drawers, list pages, entity pickers, etc.)

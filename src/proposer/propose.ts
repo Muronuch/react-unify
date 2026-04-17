@@ -23,6 +23,8 @@ export interface ProposalResult {
 export interface ProposeOptions {
   maxRetries?: number;
   model?: string;
+  /** Called once per attempt with the failure reason, so callers can surface real errors. */
+  onAttemptError?: (attempt: number, error: string) => void;
 }
 
 const NAME_RE = /(?:export\s+(?:default\s+)?(?:const|function)\s+)([A-Z][A-Za-z0-9_]*)/;
@@ -49,6 +51,10 @@ export async function proposeUnification(
       raw = await client.complete({ prompt, model: opts.model });
     } catch (e) {
       lastErr = (e as Error).message;
+      opts.onAttemptError?.(attempt + 1, lastErr);
+      if (process.env["REACT_UNIFY_DEBUG"]) {
+        console.error(`[debug] cluster ${cluster.id} attempt ${attempt + 1} LLM call threw: ${lastErr}`);
+      }
       await delay(1000 * Math.pow(3, attempt));
       continue;
     }
@@ -57,6 +63,11 @@ export async function proposeUnification(
       return assembleProposal(cluster, descriptors, parsed.generic_source, parsed.rewrites);
     }
     lastErr = parsed.error;
+    opts.onAttemptError?.(attempt + 1, lastErr);
+    if (process.env["REACT_UNIFY_DEBUG"]) {
+      console.error(`[debug] cluster ${cluster.id} attempt ${attempt + 1} parse failed: ${parsed.error}`);
+      console.error(`[debug] raw response (${raw.length} chars):\n--- BEGIN ---\n${raw}\n--- END ---`);
+    }
     prompt = buildRetryPrompt(buildProposalPrompt(cluster, sources), lastErr);
     await delay(1000 * (attempt + 1));
   }
