@@ -73,3 +73,11 @@ describe("extractComponents — directory exclusions", () => {
     expect(names).not.toContain("InternalTest");
   });
 });
+
+describe("extractComponents — re-exports", () => {
+  it("does not double-count components that are only re-exported", () => {
+    const components = extractComponents(FIXTURES, ["simple-functional.tsx", "reexport.tsx"]);
+    const greetings = components.filter((c) => c.component_name === "Greeting");
+    expect(greetings).toHaveLength(1);
+  });
+});
