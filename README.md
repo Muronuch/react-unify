@@ -4,45 +4,78 @@ A CLI that scans a React/TypeScript codebase, finds structurally similar compone
 
 Optional `--propose` flag adds an LLM step that drafts a unified component per cluster and verifies it compiles via `tsc`. Off by default; you don't need an API key for the core workflow.
 
+## How it's different
+
+Most "duplicate code" detectors compare tokens or line hashes (jscpd, SonarQube's CPD). They're language-agnostic but blind to *what the code does* — they miss two components that have the same shape but different identifiers, and they flag two functions that happen to share a few lines but solve unrelated problems.
+
+`react-unify` is built around a few choices that make it useful specifically for React refactoring:
+
+- **AST-aware fingerprinting, not token diff.** Uses `ts-morph` to extract each component's props, hooks, JSX tag bag, structural flags (list rendering, conditional, data-fetching, forms), and depth — then clusters by Jaccard-weighted similarity of those fingerprints. Result: it groups three Card components that differ only in `userName` vs `productName` vs `teamName`, and ignores two unrelated functions that happen to share a `useEffect`.
+- **React-specific category heuristics.** Knows what looks like a form, list, card, modal, or navigation — uses that to keep the clusterer from merging a `<form>` with a `<table>` even when their hook profiles overlap.
+- **Repo-level rules for team standards.** A `.react-unify.json` lets you encode policies like *"Create / Update / Delete drawers stay separate by design"* — the scanner won't propose merging across them. Most duplication detectors have no way to express this.
+- **Optional LLM, deterministic core.** The clusterer + report run in seconds with no API key. Drafting the unified component via LLM is opt-in (`--propose`); skip it and let Claude Code (or you) write the merge with full project context.
+- **Built for Claude Code workflows.** Ships a skill so *"find duplicate components"* in Claude Code triggers the scan, summarizes top clusters in chat with clickable source links, and offers two merge paths (Claude Code writes it, or run `--propose`).
+- **Read-only.** Never modifies your source. The markdown report is the artifact; you stay in control of every diff.
+
+If you're already using jscpd / SonarQube / CodeClimate for general duplication metrics, this is complementary — they tell you the codebase has 3% duplication; react-unify tells you *which 11 Delete drawers* to look at and points you straight to the line ranges.
+
 ## Install
 
-This package is not yet published to npm. To use it today, clone and link locally:
-
 ```bash
-git clone <this-repo> react-unify
-cd react-unify
-npm install
-npm run build
-npm link
-```
-
-`npm link` registers the `react-unify` command globally against your local build. To upgrade later: `git pull && npm run build`. To uninstall: `npm unlink -g react-unify`.
-
-Alternatively, run directly from the repo without linking:
-
-```bash
-node /path/to/react-unify/dist/index.js scan ./src
+npm install -g react-unify
+# or run without installing:
+npx react-unify scan ./src
 ```
 
 ### Claude Code integration (recommended)
 
-`react-unify` ships with a Claude Code skill at [.claude/skills/react-unify/SKILL.md](.claude/skills/react-unify/SKILL.md). Install it once and Claude Code will invoke the tool automatically whenever you ask things like *"find duplicate components"*, *"what can I deduplicate?"*, or *"scan for refactoring opportunities"*.
+`react-unify` ships with a Claude Code skill. Install it once and Claude Code will invoke the tool whenever you ask *"find duplicate components"*, *"what can I deduplicate?"*, or *"scan for refactoring opportunities"*.
 
-Install for your user account (available in every project):
+After `npm install -g react-unify`:
 
 ```bash
 # Linux / macOS
 mkdir -p ~/.claude/skills
-cp -r .claude/skills/react-unify ~/.claude/skills/
+cp -r "$(npm root -g)/react-unify/.claude/skills/react-unify" ~/.claude/skills/
 
 # Windows (bash)
 mkdir -p "$HOME/.claude/skills"
-cp -r .claude/skills/react-unify "$HOME/.claude/skills/"
+cp -r "$(npm root -g)/react-unify/.claude/skills/react-unify" "$HOME/.claude/skills/"
 ```
 
-Or install for a single project only — copy the `.claude/skills/react-unify` folder into that project's root. Claude Code picks it up from either location.
+Or install per-project: copy the `.claude/skills/react-unify` folder into your project's root. Claude Code picks it up from either location.
 
-With the skill installed, you can open Claude Code in any React project and say *"find duplicate components"*. Claude Code will run the scan, read the report, and summarize the top clusters with clickable source links. No need to remember CLI flags.
+With the skill installed, open Claude Code in any React project and say *"find duplicate components"*. Claude Code runs the scan, summarizes the top clusters, and offers to write the unified component using your project's full context. No need to remember CLI flags.
+
+## Demo
+
+Scanning a 287-component React frontend in 3 seconds:
+
+```
+$ react-unify scan ./src
+✔ Found 287 components
+✔ Fingerprinted
+✔ Found 20 cluster(s) (693 pair(s) blocked by rules)
+Scanned 287 components
+Found 20 cluster(s) — 0 mergeable
+Report written to ./react-unify-report.md
+(re-run with --propose for LLM-generated unified-component proposals)
+```
+
+Snippet from the report:
+
+```markdown
+## Cluster 1 — confidence: high (similarity 0.93)
+
+**Components:**
+- [`APIDomainDeleteDrawer`](src/modules/api/domain/DeleteDrawer.tsx#L19-L97) — 79 lines L19-97
+- [`HRPDPSpecialtyDeleteDrawer`](src/modules/hr/pdp/specialty/SpecialtyDeleteDrawer.tsx#L16-L74) — 59 lines L16-74
+- [`HRPDPGoalDeleteDrawer`](src/modules/hr/pdp/goal/DeleteDrawer.tsx#L16-L70) — 55 lines L16-70
+- [`HRPDPCompetencyDeleteDrawer`](src/modules/hr/pdp/competency/CompetencyDeleteDrawer.tsx#L16-L74) — 59 lines L16-74
+- ...7 more delete drawers across HR, OKR, API, Settings modules
+```
+
+Links are clickable in VSCode's markdown preview — Ctrl+click jumps to the component's line range.
 
 ## Usage
 
@@ -160,7 +193,7 @@ The `--max-cluster-size` cap (default 8) is the second lever. Raise it if your c
 
 **"No .tsx/.jsx components found"** — The target path may be wrong, or all components live in excluded directories (`node_modules`, `dist`, `build`, `.next`, `coverage`, `__tests__`, `.git`). Point the scanner at `./src` explicitly, not the repo root.
 
-**"No API key found — running in --dry-run mode"** — Expected if `ANTHROPIC_API_KEY` isn't set. Either set it, or pass `--dry-run` explicitly to suppress the warning.
+**`--propose requires an API key`** — Set `ANTHROPIC_API_KEY` (or your provider's variable) in your shell. The default scan-only mode never needs a key; this error only fires when `--propose` is passed without one.
 
 **Verifier fails on every cluster** — The verifier runs `npx tsc --noEmit --project <temp-copy>/tsconfig.json`. It uses `react-unify`'s own TypeScript install (the target's `node_modules` is intentionally skipped during copy). If your project relies on non-standard type packages or path aliases, the verifier may report phantom errors. Use `--no-verify` to skip this step if needed.
 
@@ -178,17 +211,37 @@ parser (ts-morph) → analyzer (structural fingerprint) → clusterer
 
 Each cluster's proposal is a generic component plus thin wrappers that keep the original component names and file paths intact, so nothing else in the codebase needs to change.
 
-## Development
+## Develop locally
+
+To work on `react-unify` itself:
+
+```bash
+git clone https://github.com/Muronuch/react-unify.git
+cd react-unify
+npm install
+npm run build
+npm link            # registers `react-unify` against your local build
+```
+
+To upgrade later: `git pull && npm run build`. To unlink: `npm unlink -g react-unify`.
+
+Run directly without linking:
+
+```bash
+node /path/to/react-unify/dist/index.js scan ./src
+```
+
+Common scripts:
 
 ```bash
 npm test          # run vitest
 npm run typecheck # tsc --noEmit
 npm run build     # compile to dist/
-npm run dev       # run src/index.ts via tsx
+npm run dev       # run src/index.ts via tsx (no build step)
 ```
 
 The sample fixture project at [test/fixtures/sample-project/](test/fixtures/sample-project/) has 8 components in 3 expected clusters (cards, lists, forms) — useful for smoke-testing changes end-to-end.
 
 ## License
 
-MIT.
+[MIT](LICENSE).

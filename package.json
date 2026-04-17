@@ -1,7 +1,7 @@
 {
   "name": "react-unify",
   "version": "0.1.0",
-  "description": "Find and merge duplicate React components using AI",
+  "description": "Find structurally similar React components and write a clickable cluster report. Optional LLM proposer drafts the unified component.",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -13,12 +13,40 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm test"
   },
   "engines": {
     "node": ">=20"
   },
   "license": "MIT",
+  "author": "Muronuch",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Muronuch/react-unify.git"
+  },
+  "homepage": "https://github.com/Muronuch/react-unify#readme",
+  "bugs": {
+    "url": "https://github.com/Muronuch/react-unify/issues"
+  },
+  "keywords": [
+    "react",
+    "typescript",
+    "refactoring",
+    "duplicate-detection",
+    "code-analysis",
+    "claude-code",
+    "ast",
+    "ts-morph",
+    "component",
+    "deduplication"
+  ],
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md",
+    ".claude/skills"
+  ],
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",
     "chalk": "^5.6.2",
