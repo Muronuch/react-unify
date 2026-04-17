@@ -19,11 +19,14 @@ export class AnthropicClient implements LLMClient {
     this.defaultModel = defaultModel;
   }
   async complete(req: LLMRequest): Promise<string> {
-    const resp = await this.client.messages.create({
-      model: req.model ?? this.defaultModel,
-      max_tokens: req.max_tokens ?? 4096,
-      messages: [{ role: "user", content: req.prompt }],
-    });
+    const resp = await this.client.messages.create(
+      {
+        model: req.model ?? this.defaultModel,
+        max_tokens: req.max_tokens ?? 4096,
+        messages: [{ role: "user", content: req.prompt }],
+      },
+      { timeout: 60_000 }
+    );
     const text = resp.content
       .filter((block): block is Anthropic.TextBlock => block.type === "text")
       .map((b) => b.text)

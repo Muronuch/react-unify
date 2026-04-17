@@ -2,6 +2,7 @@
 import type { ComponentCluster } from "../clusterer/cluster.js";
 import type { ComponentDescriptor } from "../parser/types.js";
 import type { LLMClient } from "./llm-client.js";
+import type { ProposalSlim } from "../reporter/report.js";
 import { buildProposalPrompt, buildRetryPrompt } from "./prompts.js";
 import { parseLlmResponse } from "./parse-response.js";
 
@@ -58,6 +59,8 @@ export async function proposeUnification(
     }
     lastErr = parsed.error;
     prompt = buildRetryPrompt(buildProposalPrompt(cluster, sources), lastErr);
+    // Backoff before next parse-failure retry (1s, 2s, 3s, …)
+    await delay(1000 * (attempt + 1));
   }
   return null;
 }
@@ -100,4 +103,14 @@ function assembleProposal(
 
 function countLines(s: string): number {
   return s.split("\n").length;
+}
+
+/** Convert a full ProposalResult to the slim shape used by the reporter. */
+export function toSlim(r: ProposalResult): ProposalSlim {
+  return {
+    generic_name: r.generic_component.name,
+    generic_source: r.generic_component.source,
+    rewrites: r.rewrites.map((rw) => ({ original: rw.original_path, rewrite: rw.rewrite_source })),
+    lines_saved: r.savings,
+  };
 }

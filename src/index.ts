@@ -5,11 +5,11 @@ import chalk from "chalk";
 import ora from "ora";
 import path from "node:path";
 import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import { extractComponents } from "./parser/extract.js";
 import { generateFingerprint } from "./analyzer/fingerprint.js";
 import { clusterComponents } from "./clusterer/cluster.js";
 import { buildReport, renderMarkdown, renderJson, renderConsoleSummary } from "./reporter/report.js";
-import type { ProposalSlim } from "./reporter/report.js";
 import { loadConfig } from "./utils/config.js";
 import { writeText } from "./utils/fs.js";
 
@@ -62,6 +62,16 @@ program
     const descriptors = extractComponents(config.target_dir);
     scanSpinner.succeed(chalk.green(`Found ${descriptors.length} components`));
 
+    // Fix 5: warn early when no components were found
+    if (descriptors.length === 0) {
+      console.error(chalk.yellow("Warning: no .tsx/.jsx components found in the target directory. Is the path correct?"));
+      const report = buildReport({ scanned_count: 0, clusters: [], descriptors: [], proposals: new Map() });
+      const out = config.output_format === "json" ? renderJson(report) : renderMarkdown(report);
+      writeText(config.output_path, out);
+      console.log(chalk.gray(`Empty report written to ${config.output_path}`));
+      return;
+    }
+
     const fpSpinner = ora("Analyzing component structure…").start();
     const fingerprints = descriptors.map(generateFingerprint);
     fpSpinner.succeed(chalk.green("Fingerprinted"));
@@ -72,6 +82,11 @@ program
       .slice(0, config.max_clusters);
     clSpinner.succeed(chalk.green(`Found ${clusters.length} cluster(s)`));
 
+    // Fix 6: warn when dry-run was auto-coerced due to missing API key
+    if (config.dry_run && options["dryRun"] !== true && config.api_key === null) {
+      console.error(chalk.yellow("No ANTHROPIC_API_KEY found — running in --dry-run mode (no LLM calls)"));
+    }
+
     if (config.dry_run) {
       const report = buildReport({ scanned_count: descriptors.length, clusters, descriptors, proposals: new Map() });
       const out = config.output_format === "json" ? renderJson(report) : renderMarkdown(report);
@@ -81,15 +96,11 @@ program
       return;
     }
 
-    if (!config.api_key) {
-      console.error(chalk.red("No API key found. Set ANTHROPIC_API_KEY (or pass --dry-run)."));
-      process.exit(1);
-    }
     const { createClient } = await import("./proposer/llm-client.js");
-    const { proposeUnification } = await import("./proposer/propose.js");
-    const llm = createClient(config.llm_provider, config.api_key, config.llm_model);
+    const { proposeUnification, toSlim } = await import("./proposer/propose.js");
+    const llm = createClient(config.llm_provider, config.api_key!, config.llm_model);
 
-    const proposals = new Map<number, { proposal: ProposalSlim | null; verified: boolean; verification_errors: string[] }>();
+    const proposals = new Map<number, { proposal: ReturnType<typeof toSlim> | null; verified: boolean; verification_errors: string[] }>();
     for (const cluster of clusters) {
       const sp = ora(`Proposing unified component for cluster ${cluster.id}…`).start();
       const proposal = await proposeUnification(cluster, descriptors, llm, { maxRetries: config.max_retries, model: config.llm_model });
@@ -110,16 +121,8 @@ program
         if (verified) verifySpinner!.succeed(chalk.green(`Cluster ${cluster.id}: verified`));
         else verifySpinner!.warn(chalk.yellow(`Cluster ${cluster.id}: ${verification_errors[0] ?? "verification failed"}`));
       }
-      proposals.set(cluster.id, {
-        proposal: {
-          generic_name: proposal.generic_component.name,
-          generic_source: proposal.generic_component.source,
-          rewrites: proposal.rewrites.map((r) => ({ original: r.original_path, rewrite: r.rewrite_source })),
-          lines_saved: proposal.savings,
-        },
-        verified,
-        verification_errors,
-      });
+      // Fix 4: use toSlim() instead of duplicated inline mapping
+      proposals.set(cluster.id, { proposal: toSlim(proposal), verified, verification_errors });
     }
 
     const report = buildReport({ scanned_count: descriptors.length, clusters, descriptors, proposals });
@@ -129,6 +132,6 @@ program
     console.log(chalk.gray(`Report written to ${config.output_path}`));
   });
 
-const isMain = import.meta.url === `file://${process.argv[1]?.replace(/\\/g, "/")}` ||
-               import.meta.url.endsWith(process.argv[1]?.replace(/\\/g, "/") ?? "");
+// Fix 3: robust isMain detection using fileURLToPath
+const isMain = fileURLToPath(import.meta.url) === path.resolve(process.argv[1] ?? "");
 if (isMain) program.parseAsync(process.argv);

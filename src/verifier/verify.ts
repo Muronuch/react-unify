@@ -18,6 +18,55 @@ export interface VerificationResult {
   test_errors: string[];
 }
 
+/**
+ * Resolve the path inside tempDir where the generic component should be written.
+ *
+ * Strategy:
+ * 1. Scan each rewrite_source for an import statement that references the generic
+ *    component name. If found and the import path is relative, resolve it relative
+ *    to the rewrite's directory in the temp copy.
+ * 2. If no relative import is found in any rewrite, fall back to
+ *    <dirname-of-first-rewrite>/unified/<file_name>.
+ */
+export function resolveGenericPath(proposal: ProposalResult, tempDir: string, projectDir: string): string {
+  const genericName = proposal.generic_component.name;
+  const fileName = proposal.generic_component.file_name;
+  const ext = path.extname(fileName);
+
+  for (const rw of proposal.rewrites) {
+    // Match: import { ... } from "./some/path" or import X from "./some/path"
+    // The import path just needs to contain the genericName as the last segment (without ext).
+    const importRe = /from\s+["']([^"']+)["']/g;
+    let m: RegExpExecArray | null;
+    while ((m = importRe.exec(rw.rewrite_source)) !== null) {
+      const importPath = m[1]!;
+      if (!importPath.startsWith(".")) continue;
+      // Check last segment (without extension) matches generic name
+      const baseName = path.basename(importPath, path.extname(importPath));
+      if (baseName !== genericName) continue;
+
+      // Found a relative import for the generic component.
+      // Resolve it relative to the rewrite's directory in the temp copy.
+      const relPath = path.relative(projectDir, rw.original_path);
+      const rewriteDirInTemp = path.dirname(path.join(tempDir, relPath));
+      // Strip extension from importPath and add the actual file extension
+      const importPathNoExt = importPath.replace(/\.(tsx?|jsx?)$/, "");
+      const resolved = path.resolve(rewriteDirInTemp, importPathNoExt + ext);
+      return resolved;
+    }
+  }
+
+  // Fallback: place next to the first rewrite's directory under unified/
+  if (proposal.rewrites.length > 0) {
+    const firstRel = path.relative(projectDir, proposal.rewrites[0]!.original_path);
+    const firstDirInTemp = path.dirname(path.join(tempDir, firstRel));
+    return path.join(firstDirInTemp, "unified", fileName);
+  }
+
+  // Last resort: original hardcoded location
+  return path.join(tempDir, "src", "components", "unified", fileName);
+}
+
 export async function verifyProposal(
   proposal: ProposalResult,
   projectDir: string,
@@ -26,10 +75,10 @@ export async function verifyProposal(
   return withTempDir("react-unify-verify", async (tempDir) => {
     copyProjectExcludingHeavy(projectDir, tempDir);
 
-    // Write the generic component to src/components/unified/
-    const unifiedDir = path.join(tempDir, "src", "components", "unified");
-    fs.mkdirSync(unifiedDir, { recursive: true });
-    writeText(path.join(unifiedDir, proposal.generic_component.file_name), proposal.generic_component.source);
+    // Write the generic component to the path derived from the rewrite imports.
+    const genericDestPath = resolveGenericPath(proposal, tempDir, projectDir);
+    fs.mkdirSync(path.dirname(genericDestPath), { recursive: true });
+    writeText(genericDestPath, proposal.generic_component.source);
 
     // Replace each original file with the rewrite
     for (const rw of proposal.rewrites) {
@@ -42,8 +91,30 @@ export async function verifyProposal(
     // Run from TOOL_ROOT so npx can find the installed typescript package.
     // Pass --project with the absolute path to the temp copy's tsconfig.
     const tsconfig = path.join(tempDir, "tsconfig.json");
-    const tsconfigArgs = fs.existsSync(tsconfig) ? ["--noEmit", "--project", tsconfig] : ["--noEmit", "--rootDir", tempDir];
-    const tscResult = await runCommand("npx", ["tsc", ...tsconfigArgs], { cwd: TOOL_ROOT });
+    let tsconfigArgs: string[];
+    if (fs.existsSync(tsconfig)) {
+      tsconfigArgs = ["--noEmit", "--project", tsconfig];
+    } else {
+      // No tsconfig — write a minimal one so tsc knows which files to compile.
+      const minimalTsconfig = {
+        compilerOptions: {
+          noEmit: true,
+          jsx: "preserve",
+          esModuleInterop: true,
+          skipLibCheck: true,
+          module: "ESNext",
+          moduleResolution: "Bundler",
+          target: "ES2022",
+          strict: true,
+          allowJs: true,
+        },
+        include: ["**/*.{ts,tsx,js,jsx}"],
+      };
+      const tsconfigPath = path.join(tempDir, "tsconfig.json");
+      fs.writeFileSync(tsconfigPath, JSON.stringify(minimalTsconfig, null, 2));
+      tsconfigArgs = ["--noEmit", "--project", tsconfigPath];
+    }
+    const tscResult = await runCommand("npx", ["tsc", ...tsconfigArgs], { cwd: TOOL_ROOT, timeout: 180_000 });
     const compiles = tscResult.ok;
     const type_errors = compiles ? [] : parseTscErrors(tscResult.stdout + "\n" + tscResult.stderr);
 
@@ -52,11 +123,11 @@ export async function verifyProposal(
     if (compiles && opts.runTests) {
       const runner = detectTestRunner(tempDir);
       if (runner === "vitest") {
-        const r = await runCommand("npx", ["vitest", "run", "--bail", "1"], { cwd: tempDir });
+        const r = await runCommand("npx", ["vitest", "run", "--bail", "1"], { cwd: tempDir, timeout: 180_000 });
         tests_pass = r.ok;
         if (!r.ok) test_errors = [truncate(r.stdout + r.stderr, 2000)];
       } else if (runner === "jest") {
-        const r = await runCommand("npx", ["jest", "--passWithNoTests", "--bail"], { cwd: tempDir });
+        const r = await runCommand("npx", ["jest", "--passWithNoTests", "--bail"], { cwd: tempDir, timeout: 180_000 });
         tests_pass = r.ok;
         if (!r.ok) test_errors = [truncate(r.stdout + r.stderr, 2000)];
       }
