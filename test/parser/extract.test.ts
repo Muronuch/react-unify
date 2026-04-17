@@ -43,3 +43,13 @@ describe("extractComponents — list and conditional rendering", () => {
     expect(list!.jsx_tree.some((n) => n.has_conditional)).toBe(true);
   });
 });
+
+describe("extractComponents — multiple components per file", () => {
+  it("extracts all three components with correct export types", () => {
+    const components = extractComponents(FIXTURES, ["multiple-components.tsx"]);
+    const names = components.map((c) => c.component_name).sort();
+    expect(names).toEqual(["Footer", "Header", "Page"]);
+    const page = components.find((c) => c.component_name === "Page")!;
+    expect(page.export_type).toBe("default");
+  });
+});
