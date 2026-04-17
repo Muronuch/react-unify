@@ -33,3 +33,13 @@ describe("extractComponents — hooks", () => {
     expect(counter!.has_effects).toBe(true);
   });
 });
+
+describe("extractComponents — list and conditional rendering", () => {
+  it("flags has_map and has_conditional in JSX tree nodes", () => {
+    const components = extractComponents(FIXTURES, ["with-map-and-conditional.tsx"]);
+    const list = components.find((c) => c.component_name === "ItemList");
+    expect(list).toBeDefined();
+    expect(list!.jsx_tree.some((n) => n.has_map)).toBe(true);
+    expect(list!.jsx_tree.some((n) => n.has_conditional)).toBe(true);
+  });
+});
