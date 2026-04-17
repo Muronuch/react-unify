@@ -25,7 +25,7 @@ program
 program
   .command("scan <directory>")
   .description("Scan a React project for mergeable components")
-  .option("-t, --threshold <number>", "similarity threshold 0-1", (v) => parseFloat(v), 0.6)
+  .option("-t, --threshold <number>", "similarity threshold 0-1", (v) => parseFloat(v), 0.75)
   .option("-o, --output <path>", "output report path")
   .option("--json", "emit JSON instead of markdown")
   .option("--no-verify", "skip TypeScript compilation verification")
@@ -36,6 +36,7 @@ program
   .option("--verbose", "verbose progress output")
   .option("--max-clusters <number>", "max clusters to process", (v) => parseInt(v, 10), 20)
   .option("--min-cluster-size <number>", "min cluster size", (v) => parseInt(v, 10), 2)
+  .option("--max-cluster-size <number>", "max cluster size (prevents runaway merges)", (v) => parseInt(v, 10), 8)
   .action(async (directory: string, options: Record<string, unknown>) => {
     const config = loadConfig({
       target_dir: path.resolve(directory),
@@ -50,6 +51,7 @@ program
       threshold: options["threshold"] as number | undefined,
       maxClusters: options["maxClusters"] as number | undefined,
       minClusterSize: options["minClusterSize"] as number | undefined,
+      maxClusterSize: options["maxClusterSize"] as number | undefined,
     });
 
     if (!fs.existsSync(config.target_dir)) {
@@ -75,7 +77,7 @@ program
     fpSpinner.succeed(chalk.green("Fingerprinted"));
 
     const clSpinner = ora("Finding similar components…").start();
-    const clusters = clusterComponents(fingerprints, config.similarity_threshold)
+    const clusters = clusterComponents(fingerprints, config.similarity_threshold, config.max_cluster_size)
       .filter((c) => c.components.length >= config.min_cluster_size)
       .slice(0, config.max_clusters);
     clSpinner.succeed(chalk.green(`Found ${clusters.length} cluster(s)`));

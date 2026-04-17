@@ -20,7 +20,7 @@ react-unify scan <directory> [options]
 
 | Flag | Default | Description |
 | --- | --- | --- |
-| `-t, --threshold <0..1>` | `0.6` | Similarity threshold for clustering |
+| `-t, --threshold <0..1>` | `0.75` | Similarity threshold for clustering |
 | `-o, --output <path>` | `react-unify-report.md` | Report output path |
 | `--json` | off | Emit JSON instead of markdown |
 | `--no-verify` | off | Skip TypeScript compilation verification |
@@ -31,6 +31,7 @@ react-unify scan <directory> [options]
 | `--verbose` | off | Verbose output |
 | `--max-clusters <n>` | `20` | Max clusters to process |
 | `--min-cluster-size <n>` | `2` | Min components per cluster |
+| `--max-cluster-size <n>` | `8` | Max components per cluster (prevents runaway merges) |
 
 ### Environment
 

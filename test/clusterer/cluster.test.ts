@@ -98,4 +98,16 @@ describe("clusterComponents", () => {
     expect(clusters[0]!.id).toBe(1);
     expect(clusters[1]!.id).toBe(2);
   });
+  it("respects maxClusterSize and splits a too-large family into multiple clusters", () => {
+    const items = Array.from({ length: 7 }, (_, i) =>
+      fp({ component_name: `C${i}`, category: "card", jsx_tag_bag: ["div", "h3"] })
+    );
+    const capped = clusterComponents(items, 0.6, 3);
+    for (const cl of capped) expect(cl.components.length).toBeLessThanOrEqual(3);
+    const totalCovered = capped.reduce((sum, cl) => sum + cl.components.length, 0);
+    expect(totalCovered).toBeGreaterThanOrEqual(6);
+
+    const uncapped = clusterComponents(items, 0.6);
+    expect(uncapped[0]!.components.length).toBeGreaterThan(3);
+  });
 });

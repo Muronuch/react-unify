@@ -15,6 +15,7 @@ export interface Config {
   verbose: boolean;
   max_clusters: number;
   min_cluster_size: number;
+  max_cluster_size: number;
 }
 
 export interface ConfigOverrides {
@@ -30,6 +31,7 @@ export interface ConfigOverrides {
   threshold?: number;
   maxClusters?: number;
   minClusterSize?: number;
+  maxClusterSize?: number;
 }
 
 const DEFAULT_MODEL = "claude-sonnet-4-6";
@@ -50,12 +52,13 @@ export function loadConfig(overrides: ConfigOverrides, env: NodeJS.ProcessEnv = 
     target_dir: overrides.target_dir,
     output_path: overrides.output ?? (json ? "./react-unify-report.json" : "./react-unify-report.md"),
     output_format: json ? "json" : "markdown",
-    similarity_threshold: overrides.threshold ?? 0.6,
+    similarity_threshold: overrides.threshold ?? 0.75,
     verify: overrides.noVerify !== true,
     run_tests: overrides.noTests !== true,
     dry_run: overrides.dryRun === true || api_key === null,
     verbose: overrides.verbose === true,
     max_clusters: overrides.maxClusters ?? 20,
     min_cluster_size: overrides.minClusterSize ?? 2,
+    max_cluster_size: overrides.maxClusterSize ?? 8,
   };
 }

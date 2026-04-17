@@ -58,7 +58,8 @@ export function similarity(a: ComponentFingerprint, b: ComponentFingerprint): nu
 
 export function clusterComponents(
   fps: ComponentFingerprint[],
-  threshold = 0.6
+  threshold = 0.6,
+  maxClusterSize = Infinity
 ): ComponentCluster[] {
   if (fps.length < 2) return [];
 
@@ -87,6 +88,7 @@ export function clusterComponents(
     let bestS = -1;
     for (let i = 0; i < clusters.length; i++) {
       for (let j = i + 1; j < clusters.length; j++) {
+        if (clusters[i]!.length + clusters[j]!.length > maxClusterSize) continue;
         const s = avgLink(clusters[i]!, clusters[j]!);
         if (s > bestS) { bestS = s; bestI = i; bestJ = j; }
       }
