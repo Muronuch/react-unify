@@ -21,3 +21,15 @@ describe("extractComponents — simple functional", () => {
     expect(greeting!.line_count).toBeGreaterThan(0);
   });
 });
+
+describe("extractComponents — hooks", () => {
+  it("records useState and useEffect, sets has_state and has_effects", () => {
+    const components = extractComponents(FIXTURES, ["with-hooks.tsx"]);
+    const counter = components.find((c) => c.component_name === "Counter");
+    expect(counter).toBeDefined();
+    const hookNames = counter!.hooks.map((h) => h.hook).sort();
+    expect(hookNames).toEqual(["useEffect", "useState"]);
+    expect(counter!.has_state).toBe(true);
+    expect(counter!.has_effects).toBe(true);
+  });
+});
