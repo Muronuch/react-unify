@@ -109,7 +109,7 @@ export function renderMarkdown(r: Report): string {
     lines.push("");
     lines.push("**Components:**");
     for (const comp of c.components) {
-      const href = encodeURI(comp.file);
+      const href = toFileHref(comp.file);
       const anchor = comp.line_start && comp.line_end ? `#L${comp.line_start}-L${comp.line_end}` : "";
       const rangeLabel = comp.line_start && comp.line_end ? ` L${comp.line_start}-${comp.line_end}` : "";
       lines.push(`- [\`${comp.name}\`](${href}${anchor}) — ${comp.lines} lines${rangeLabel}`);
@@ -156,4 +156,13 @@ export function renderConsoleSummary(r: Report): string {
     `Found ${r.summary.clusters_found} cluster(s) — ${r.summary.mergeable_clusters} mergeable`,
     `Potential savings: ${r.summary.total_lines_saveable} lines across ${r.summary.components_affected} components`,
   ].join("\n");
+}
+
+// VSCode markdown preview only follows file: URIs for absolute paths; bare "C:/..."
+// is treated as relative to the markdown file and resolves to nothing.
+function toFileHref(filePath: string): string {
+  const normalized = filePath.replace(/\\/g, "/");
+  if (/^[A-Za-z]:\//.test(normalized)) return "file:///" + encodeURI(normalized);
+  if (normalized.startsWith("/")) return "file://" + encodeURI(normalized);
+  return encodeURI(normalized);
 }
