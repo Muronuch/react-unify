@@ -62,3 +62,14 @@ describe("extractComponents — no props", () => {
     expect(loader!.props).toEqual([]);
   });
 });
+
+describe("extractComponents — directory exclusions", () => {
+  it("ignores node_modules and __tests__", () => {
+    const dir = path.join(FIXTURES, "exclusions");
+    const components = extractComponents(dir);
+    const names = components.map((c) => c.component_name);
+    expect(names).toContain("Real");
+    expect(names).not.toContain("Leaked");
+    expect(names).not.toContain("InternalTest");
+  });
+});
