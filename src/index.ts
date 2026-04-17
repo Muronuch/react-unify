@@ -99,6 +99,17 @@ program
         continue;
       }
       sp.succeed(chalk.green(`Cluster ${cluster.id}: ${proposal.generic_component.name} (saves ${proposal.savings} lines)`));
+      const verifySpinner = config.verify ? ora(`Verifying cluster ${cluster.id}…`).start() : null;
+      let verified = false;
+      let verification_errors: string[] = [];
+      if (config.verify) {
+        const { verifyProposal } = await import("./verifier/verify.js");
+        const v = await verifyProposal(proposal, config.target_dir, { runTests: config.run_tests });
+        verified = v.compiles && v.tests_pass !== false;
+        verification_errors = [...v.type_errors, ...v.test_errors];
+        if (verified) verifySpinner!.succeed(chalk.green(`Cluster ${cluster.id}: verified`));
+        else verifySpinner!.warn(chalk.yellow(`Cluster ${cluster.id}: ${verification_errors[0] ?? "verification failed"}`));
+      }
       proposals.set(cluster.id, {
         proposal: {
           generic_name: proposal.generic_component.name,
@@ -106,8 +117,8 @@ program
           rewrites: proposal.rewrites.map((r) => ({ original: r.original_path, rewrite: r.rewrite_source })),
           lines_saved: proposal.savings,
         },
-        verified: false,
-        verification_errors: [],
+        verified,
+        verification_errors,
       });
     }
 
