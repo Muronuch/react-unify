@@ -53,3 +53,12 @@ describe("extractComponents — multiple components per file", () => {
     expect(page.export_type).toBe("default");
   });
 });
+
+describe("extractComponents — no props", () => {
+  it("returns an empty props array", () => {
+    const components = extractComponents(FIXTURES, ["no-props.tsx"]);
+    const loader = components.find((c) => c.component_name === "Loader");
+    expect(loader).toBeDefined();
+    expect(loader!.props).toEqual([]);
+  });
+});
