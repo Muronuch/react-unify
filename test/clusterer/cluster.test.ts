@@ -1,4 +1,3 @@
-// test/clusterer/cluster.test.ts
 import { describe, it, expect } from "vitest";
 import { jaccard, similarity, clusterComponents } from "../../src/clusterer/cluster.js";
 import type { ComponentFingerprint } from "../../src/analyzer/fingerprint.js";

@@ -1,4 +1,3 @@
-// src/clusterer/cluster.ts
 import type { ComponentFingerprint } from "../analyzer/fingerprint.js";
 
 export type MergeConfidence = "high" | "medium" | "low";
@@ -24,20 +23,17 @@ export function similarity(a: ComponentFingerprint, b: ComponentFingerprint): nu
   let score = 0;
   let weights_total = 0;
 
-  // 1. Same category (weight: 3)
   if (a.category === b.category) score += 3;
   weights_total += 3;
 
-  // 2. Hook overlap (weight: 2)
   score += jaccard(a.hook_names_sorted, b.hook_names_sorted) * 2;
   weights_total += 2;
 
-  // 3. JSX tag overlap (weight: 2)
   score += jaccard(a.jsx_tag_bag, b.jsx_tag_bag) * 2;
   weights_total += 2;
 
-  // 4. Prop type Jaccard (weight: 1)
-  // Treat both-empty as identical (jaccard returns 0 for empty sets by convention)
+  // Two empty prop sets are "identical" here; jaccard returns 0 for them by convention,
+  // which would otherwise prevent similarity(a, a) from reaching 1 for prop-less components.
   const propSim =
     a.prop_types_sorted.length === 0 && b.prop_types_sorted.length === 0
       ? 1
@@ -45,7 +41,6 @@ export function similarity(a: ComponentFingerprint, b: ComponentFingerprint): nu
   score += propSim * 1;
   weights_total += 1;
 
-  // 5. Structural flag agreement (weight: 1)
   let flag_match = 0;
   if (a.has_list_rendering === b.has_list_rendering) flag_match++;
   if (a.has_conditional_rendering === b.has_conditional_rendering) flag_match++;
@@ -54,7 +49,6 @@ export function similarity(a: ComponentFingerprint, b: ComponentFingerprint): nu
   score += (flag_match / 4) * 1;
   weights_total += 1;
 
-  // 6. JSX depth closeness (weight: 1)
   const depth_diff = Math.abs(a.jsx_depth - b.jsx_depth);
   score += Math.max(0, 1 - depth_diff / 5) * 1;
   weights_total += 1;
@@ -68,7 +62,6 @@ export function clusterComponents(
 ): ComponentCluster[] {
   if (fps.length < 2) return [];
 
-  // Pairwise similarity matrix
   const n = fps.length;
   const sim: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
   for (let i = 0; i < n; i++) {
@@ -79,7 +72,6 @@ export function clusterComponents(
     }
   }
 
-  // Each cluster starts as a singleton index list
   let clusters: number[][] = fps.map((_, i) => [i]);
 
   function avgLink(a: number[], b: number[]): number {
@@ -105,7 +97,6 @@ export function clusterComponents(
     clusters.push(merged);
   }
 
-  // Drop singletons, score, sort
   const out: ComponentCluster[] = [];
   for (const cl of clusters) {
     if (cl.length < 2) continue;

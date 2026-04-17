@@ -1,4 +1,3 @@
-// src/proposer/propose.ts
 import type { ComponentCluster } from "../clusterer/cluster.js";
 import type { ComponentDescriptor } from "../parser/types.js";
 import type { LLMClient } from "./llm-client.js";
@@ -59,7 +58,6 @@ export async function proposeUnification(
     }
     lastErr = parsed.error;
     prompt = buildRetryPrompt(buildProposalPrompt(cluster, sources), lastErr);
-    // Backoff before next parse-failure retry (1s, 2s, 3s, …)
     await delay(1000 * (attempt + 1));
   }
   return null;

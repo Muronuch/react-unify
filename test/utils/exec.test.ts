@@ -1,4 +1,3 @@
-// test/utils/exec.test.ts
 import { describe, it, expect } from "vitest";
 import path from "node:path";
 import process from "node:process";
@@ -28,9 +27,7 @@ describe("quoteForCmd", () => {
 
 describe("runCommand", () => {
   it("runs node -e with a path containing a space", async () => {
-    // Use a temp dir path with a space to exercise quoteForCmd on Windows.
     const nodeBin = process.execPath;
-    // We pass a simple script; the path to node itself may contain spaces on Windows.
     const result = await runCommand(nodeBin, ["-e", "process.stdout.write('ok')"]);
     expect(result.ok).toBe(true);
     expect(result.stdout.trim()).toBe("ok");
@@ -38,7 +35,6 @@ describe("runCommand", () => {
 
   it("returns code 124 and [timeout] marker when command exceeds timeout", async () => {
     const nodeBin = process.execPath;
-    // A script that sleeps for 5 seconds — we give it only 500 ms.
     const result = await runCommand(nodeBin, ["-e", "setTimeout(()=>{},5000)"], { timeout: 500 });
     expect(result.ok).toBe(false);
     expect(result.code).toBe(124);

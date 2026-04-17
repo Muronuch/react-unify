@@ -1,4 +1,3 @@
-// src/parser/extract.ts
 import {
   Project,
   Node,

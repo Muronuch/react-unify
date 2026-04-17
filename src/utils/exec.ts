@@ -1,4 +1,3 @@
-// src/utils/exec.ts
 import { spawn } from "node:child_process";
 
 export interface CommandResult {
@@ -8,15 +7,12 @@ export interface CommandResult {
   code: number;
 }
 
-/**
- * Escape a single argument for cmd.exe (Windows shell).
- * Only wraps in double-quotes when the arg contains characters that cmd.exe would
- * re-interpret (spaces, tabs, shell metacharacters, or empty string).
- * Embedded `"` are doubled, `^` and `%` are escaped per cmd.exe rules.
- */
+// Escapes a single arg for cmd.exe per its quoting rules. Only wraps in quotes when the
+// arg contains characters cmd.exe would re-interpret; bare flags like `--noEmit` stay
+// unquoted because some tools (e.g. node -e) reject quoted flag names.
 export function quoteForCmd(arg: string): string {
   if (!/[ \t&^|<>()@!"%]/.test(arg) && arg !== "") {
-    return arg; // safe as-is
+    return arg;
   }
   const escaped = arg
     .replace(/\^/g, "^^")
@@ -30,12 +26,9 @@ export function runCommand(
   args: string[],
   opts: { cwd?: string; env?: NodeJS.ProcessEnv; timeout?: number } = {}
 ): Promise<CommandResult> {
-  // On Windows, .cmd batch files (npx.cmd, tsc.cmd, etc.) cannot be spawned via execFile
-  // without shell:true. We use spawn with shell:true on Windows only so that cmd.exe
-  // can resolve and run the batch wrapper.
+  // execFile cannot spawn .cmd batch wrappers (npx.cmd, tsc.cmd) on Windows under
+  // bash/MSYS2; spawn+shell:true lets cmd.exe resolve them.
   const useShell = process.platform === "win32";
-  // When shell is active on Windows, quote the command and each arg individually so
-  // special characters (spaces, &, ^, %, etc.) are not re-interpreted by cmd.exe.
   const spawnCmd = useShell ? quoteForCmd(cmd) : cmd;
   const spawnArgs = useShell ? args.map(quoteForCmd) : args;
   const timeout = opts.timeout ?? 180_000;
@@ -55,7 +48,6 @@ export function runCommand(
     proc.stdout?.on("data", (chunk: Buffer) => { stdout += String(chunk); });
     proc.stderr?.on("data", (chunk: Buffer) => { stderr += String(chunk); });
 
-    // Kill the process if it runs longer than the timeout.
     const timer = setTimeout(() => {
       timedOut = true;
       proc.kill("SIGKILL");
@@ -63,7 +55,7 @@ export function runCommand(
     }, timeout);
 
     proc.on("close", (code) => {
-      if (timedOut) return; // timeout already resolved
+      if (timedOut) return;
       clearTimeout(timer);
       resolve({ ok: code === 0, stdout, stderr, code: code ?? 1 });
     });

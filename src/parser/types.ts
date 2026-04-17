@@ -1,4 +1,3 @@
-// src/parser/types.ts
 export interface PropField {
   name: string;
   type: string;

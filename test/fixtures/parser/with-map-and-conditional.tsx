@@ -1,4 +1,3 @@
-// test/fixtures/parser/with-map-and-conditional.tsx
 import React from "react";
 
 interface Item { id: string; name: string; }

@@ -1,4 +1,3 @@
-// test/proposer/parse-response.test.ts
 import { describe, it, expect } from "vitest";
 import { parseLlmResponse } from "../../src/proposer/parse-response.js";
 

@@ -1,4 +1,3 @@
-// test/fixtures/parser/with-hooks.tsx
 import React, { useEffect, useState } from "react";
 
 export function Counter({ initial }: { initial: number }) {

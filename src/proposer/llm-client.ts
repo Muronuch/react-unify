@@ -1,4 +1,3 @@
-// src/proposer/llm-client.ts
 import Anthropic from "@anthropic-ai/sdk";
 
 export interface LLMRequest {

@@ -1,4 +1,3 @@
-// test/reporter/report.test.ts
 import { describe, it, expect } from "vitest";
 import { buildReport, renderMarkdown, renderJson } from "../../src/reporter/report.js";
 import type { ComponentCluster } from "../../src/clusterer/cluster.js";

@@ -1,4 +1,3 @@
-// test/fixtures/parser/multiple-components.tsx
 import React from "react";
 
 export const Header = ({ title }: { title: string }) => <h1>{title}</h1>;

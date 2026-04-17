@@ -1,4 +1,3 @@
-// src/utils/config.ts
 export type LLMProvider = "anthropic" | "openai" | "deepseek";
 
 export interface Config {

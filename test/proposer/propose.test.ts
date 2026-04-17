@@ -1,4 +1,3 @@
-// test/proposer/propose.test.ts
 import { describe, it, expect } from "vitest";
 import path from "node:path";
 import { proposeUnification } from "../../src/proposer/propose.js";

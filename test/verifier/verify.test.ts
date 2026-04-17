@@ -1,4 +1,3 @@
-// test/verifier/verify.test.ts
 import { describe, it, expect } from "vitest";
 import path from "node:path";
 import { verifyProposal, resolveGenericPath } from "../../src/verifier/verify.js";
@@ -49,8 +48,6 @@ export const Hello = (props: { name: number }): string => GenericHello({ name: p
   });
 }, { timeout: 60000 });
 
-// ── Non-standard layout ──────────────────────────────────────────────────────
-
 const ALT_PROPOSAL: ProposalResult = {
   cluster_id: 2,
   generic_component: {
@@ -62,7 +59,6 @@ const ALT_PROPOSAL: ProposalResult = {
     {
       original_name: "Hello",
       original_path: path.join(ALT_PROJECT, "lib", "components", "Hello.tsx"),
-      // Import uses ./shared/GenericHello — a non-standard, non-src path
       rewrite_source: `import { GenericHello } from "./shared/GenericHello.js";
 export const Hello = ({ name }: { name: string }): string => GenericHello({ name });`,
     },
@@ -75,7 +71,6 @@ export const Hello = ({ name }: { name: string }): string => GenericHello({ name
 describe("resolveGenericPath", () => {
   it("resolves a relative import from a non-standard layout", () => {
     const resolved = resolveGenericPath(ALT_PROPOSAL, "/tmp/work", ALT_PROJECT);
-    // Should end up next to Hello.tsx in lib/components/shared/GenericHello.tsx
     expect(resolved.replace(/\\/g, "/")).toContain("lib/components/shared/GenericHello.tsx");
   });
 });

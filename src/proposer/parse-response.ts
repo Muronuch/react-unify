@@ -1,4 +1,3 @@
-// src/proposer/parse-response.ts
 export type ParseResult =
   | { ok: true; generic_source: string; rewrites: string[] }
   | { ok: false; error: string };

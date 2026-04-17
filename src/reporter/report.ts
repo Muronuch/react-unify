@@ -1,4 +1,3 @@
-// src/reporter/report.ts
 import type { ComponentCluster } from "../clusterer/cluster.js";
 import type { ComponentDescriptor } from "../parser/types.js";
 

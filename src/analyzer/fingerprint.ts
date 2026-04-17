@@ -1,4 +1,3 @@
-// src/analyzer/fingerprint.ts
 import type { ComponentDescriptor } from "../parser/types.js";
 
 export type CategoryName =

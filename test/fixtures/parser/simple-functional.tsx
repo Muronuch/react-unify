@@ -1,4 +1,3 @@
-// test/fixtures/parser/simple-functional.tsx
 import React from "react";
 
 interface GreetingProps {

@@ -1,4 +1,3 @@
-// test/integration/pipeline.test.ts
 import { describe, it, expect } from "vitest";
 import path from "node:path";
 import { extractComponents } from "../../src/parser/extract.js";
@@ -17,7 +16,6 @@ describe("integration: dry-run pipeline on sample-project", () => {
     const fps = descriptors.map(generateFingerprint);
     const clusters = clusterComponents(fps, 0.6);
 
-    // Fix 15: assert each family is in its own cluster, not just "somewhere" in the output
     const cardCluster = clusters.find((c) => c.components.every((x) => /Card$/.test(x.component_name)));
     expect(cardCluster).toBeDefined();
     expect(cardCluster!.components).toHaveLength(3);
@@ -60,7 +58,6 @@ export const X${i} = () => <ItemCard title="x" />;
     expect(proposal).not.toBeNull();
 
     const proposals = new Map();
-    // Fix 4: use toSlim() instead of manual mapping
     proposals.set(cardCluster.id, {
       proposal: toSlim(proposal!),
       verified: false,

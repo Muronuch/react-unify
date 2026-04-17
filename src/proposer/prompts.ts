@@ -1,4 +1,3 @@
-// src/proposer/prompts.ts
 import type { ComponentCluster } from "../clusterer/cluster.js";
 
 export function buildProposalPrompt(cluster: ComponentCluster, sources: string[]): string {

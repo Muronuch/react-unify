@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// src/index.ts
 import { Command } from "commander";
 import chalk from "chalk";
 import ora from "ora";
@@ -62,7 +61,6 @@ program
     const descriptors = extractComponents(config.target_dir);
     scanSpinner.succeed(chalk.green(`Found ${descriptors.length} components`));
 
-    // Fix 5: warn early when no components were found
     if (descriptors.length === 0) {
       console.error(chalk.yellow("Warning: no .tsx/.jsx components found in the target directory. Is the path correct?"));
       const report = buildReport({ scanned_count: 0, clusters: [], descriptors: [], proposals: new Map() });
@@ -82,7 +80,6 @@ program
       .slice(0, config.max_clusters);
     clSpinner.succeed(chalk.green(`Found ${clusters.length} cluster(s)`));
 
-    // Fix 6: warn when dry-run was auto-coerced due to missing API key
     if (config.dry_run && options["dryRun"] !== true && config.api_key === null) {
       console.error(chalk.yellow("No ANTHROPIC_API_KEY found — running in --dry-run mode (no LLM calls)"));
     }
@@ -121,7 +118,6 @@ program
         if (verified) verifySpinner!.succeed(chalk.green(`Cluster ${cluster.id}: verified`));
         else verifySpinner!.warn(chalk.yellow(`Cluster ${cluster.id}: ${verification_errors[0] ?? "verification failed"}`));
       }
-      // Fix 4: use toSlim() instead of duplicated inline mapping
       proposals.set(cluster.id, { proposal: toSlim(proposal), verified, verification_errors });
     }
 
@@ -132,6 +128,5 @@ program
     console.log(chalk.gray(`Report written to ${config.output_path}`));
   });
 
-// Fix 3: robust isMain detection using fileURLToPath
 const isMain = fileURLToPath(import.meta.url) === path.resolve(process.argv[1] ?? "");
 if (isMain) program.parseAsync(process.argv);
