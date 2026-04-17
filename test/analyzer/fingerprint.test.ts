@@ -18,3 +18,23 @@ describe("generateFingerprint — basic shape", () => {
     expect(fp.has_effects).toBe(true);
   });
 });
+
+describe("generateFingerprint — category heuristics", () => {
+  function fpFor(file: string, name: string) {
+    const d = extractComponents(FIXTURES, [file]).find((c) => c.component_name === name)!;
+    return generateFingerprint(d);
+  }
+
+  it("detects 'list' from .map() rendering", () => {
+    expect(fpFor("with-map-and-conditional.tsx", "ItemList").category).toBe("list");
+  });
+  it("detects 'form' from <form> + multiple inputs", () => {
+    expect(fpFor("form-fixture.tsx", "ContactForm").category).toBe("form");
+  });
+  it("detects 'modal' from dialog/modal markers", () => {
+    expect(fpFor("modal-fixture.tsx", "ConfirmDialog").category).toBe("modal");
+  });
+  it("detects 'navigation' from <nav>", () => {
+    expect(fpFor("nav-fixture.tsx", "TopNav").category).toBe("navigation");
+  });
+});

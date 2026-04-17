@@ -60,6 +60,28 @@ export function generateFingerprint(d: ComponentDescriptor): ComponentFingerprin
     has_effects: d.has_effects,
     has_data_fetching,
     has_form,
-    category: "other",
+    category: detectCategory({ jsx_tag_bag, has_list_rendering, has_form, hook_names_sorted, jsx_tree: d.jsx_tree, jsx_element_count: d.jsx_element_count }),
   };
+}
+
+interface CategoryInput {
+  jsx_tag_bag: string[];
+  has_list_rendering: boolean;
+  has_form: boolean;
+  hook_names_sorted: string[];
+  jsx_tree: import("../parser/types.js").JsxTreeNode[];
+  jsx_element_count: number;
+}
+
+function detectCategory(i: CategoryInput): CategoryName {
+  const tags = new Set(i.jsx_tag_bag.map((t) => t.toLowerCase()));
+  if (i.has_form || tags.has("form")) return "form";
+  if (tags.has("dialog") || i.jsx_tag_bag.some((t) => /modal|dialog|backdrop|overlay/i.test(t))) return "modal";
+  if (tags.has("nav") || tags.has("link") || i.hook_names_sorted.includes("useRouter")) return "navigation";
+  if (i.has_list_rendering) return "list";
+  if (tags.has("table") || tags.has("chart") || /chart|graph|table/.test([...tags].join(" "))) return "data-display";
+  if (i.jsx_element_count <= 2 && (tags.has("input") || tags.has("select") || tags.has("textarea"))) return "input";
+  if (i.jsx_element_count >= 3 && i.jsx_element_count <= 8 && tags.has("div")) return "card";
+  if (tags.has("section") || tags.has("main") || tags.has("aside")) return "layout";
+  return "other";
 }
