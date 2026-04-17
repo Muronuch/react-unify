@@ -51,6 +51,8 @@ describe("extractComponents — multiple components per file", () => {
     expect(names).toEqual(["Footer", "Header", "Page"]);
     const page = components.find((c) => c.component_name === "Page")!;
     expect(page.export_type).toBe("default");
+    const header = components.find((c) => c.component_name === "Header")!;
+    expect(header.line_count).toBeLessThan(page.line_count);
   });
 });
 

@@ -9,6 +9,10 @@ import {
   type ArrowFunction,
   type FunctionExpression,
   type ParameterDeclaration,
+  type CallExpression,
+  type JsxElement,
+  type JsxSelfClosingElement,
+  type BinaryExpression,
 } from "ts-morph";
 import path from "node:path";
 import type {
@@ -82,9 +86,10 @@ function findComponentLikeDeclarations(file: SourceFile): ComponentLike[] {
   const out: ComponentLike[] = [];
   for (const fn of file.getFunctions()) {
     if (returnsJsx(fn)) {
+      if (!fn.isDefaultExport() && !fn.isExported()) continue;
       out.push({
         name: fn.getName() ?? "",
-        exportType: fn.isDefaultExport() ? "default" : (fn.isExported() ? "named" : "named"),
+        exportType: fn.isDefaultExport() ? "default" : "named",
         param: fn.getParameters()[0],
         body: fn,
         hostNode: fn,
@@ -100,9 +105,10 @@ function findComponentLikeDeclarations(file: SourceFile): ComponentLike[] {
         const stmt = v.getVariableStatement();
         const isDefault = !!stmt && stmt.isDefaultExport();
         const isNamed = !!stmt && stmt.isExported();
+        if (!isDefault && !isNamed) continue;
         out.push({
           name: v.getName(),
-          exportType: isDefault ? "default" : (isNamed ? "named" : "named"),
+          exportType: isDefault ? "default" : "named",
           param: fn.getParameters()[0],
           body: fn,
           hostNode: v,
@@ -141,7 +147,7 @@ function describeComponent(
   const has_context = hooks.some((h) => h.hook === "useContext");
   const has_refs = hooks.some((h) => h.hook === "useRef" || h.hook === "useImperativeHandle");
   const imports = file.getImportDeclarations().map((d) => d.getModuleSpecifierValue());
-  const line_count = sourceText.split("\n").length;
+  const line_count = c.hostNode.getEndLineNumber() - c.hostNode.getStartLineNumber() + 1;
   return {
     file_path: filePath,
     component_name: c.name,
@@ -165,7 +171,6 @@ function extractProps(param: ParameterDeclaration | undefined): PropField[] {
   if (!param) return [];
   const typeNode = param.getTypeNode();
   if (typeNode) {
-    const text = typeNode.getText();
     const type = param.getType();
     const props: PropField[] = [];
     for (const prop of type.getProperties()) {
@@ -176,7 +181,6 @@ function extractProps(param: ParameterDeclaration | undefined): PropField[] {
       props.push({ name, type: cleanTypeText(propType), optional });
     }
     if (props.length > 0) return props;
-    void text;
   }
   const bindingPattern = param.getNameNode();
   if (Node.isObjectBindingPattern(bindingPattern)) {
@@ -197,10 +201,10 @@ function extractHooks(body: Node): HookUsage[] {
   const hooks: HookUsage[] = [];
   body.forEachDescendant((d) => {
     if (d.getKind() === SyntaxKind.CallExpression) {
-      const expr = (d as import("ts-morph").CallExpression).getExpression();
+      const expr = (d as CallExpression).getExpression();
       const name = expr.getText();
       if (/^use[A-Z]/.test(name)) {
-        const args = (d as import("ts-morph").CallExpression).getArguments();
+        const args = (d as CallExpression).getArguments();
         const args_summary = args.map((a) => truncate(a.getText(), 40)).join(", ");
         hooks.push({ hook: name, args_summary });
       }
@@ -231,7 +235,7 @@ function extractJsxTree(body: Node): JsxStats {
       let has_map = false;
       let has_conditional = false;
       if (k === SyntaxKind.JsxElement) {
-        const children = (node as import("ts-morph").JsxElement).getJsxChildren();
+        const children = (node as JsxElement).getJsxChildren();
         children_count = children.length;
         for (const ch of children) {
           if (containsMap(ch)) has_map = true;
@@ -253,10 +257,10 @@ function extractJsxTree(body: Node): JsxStats {
 function getJsxTagName(node: Node): string {
   const k = node.getKind();
   if (k === SyntaxKind.JsxElement) {
-    return (node as import("ts-morph").JsxElement).getOpeningElement().getTagNameNode().getText();
+    return (node as JsxElement).getOpeningElement().getTagNameNode().getText();
   }
   if (k === SyntaxKind.JsxSelfClosingElement) {
-    return (node as import("ts-morph").JsxSelfClosingElement).getTagNameNode().getText();
+    return (node as JsxSelfClosingElement).getTagNameNode().getText();
   }
   return "Unknown";
 }
@@ -266,7 +270,7 @@ function containsMap(node: Node): boolean {
   node.forEachDescendant((d) => {
     if (found) return;
     if (d.getKind() === SyntaxKind.CallExpression) {
-      const call = d as import("ts-morph").CallExpression;
+      const call = d as CallExpression;
       const expr = call.getExpression();
       if (expr.getText().endsWith(".map")) {
         found = true;
@@ -283,7 +287,7 @@ function containsConditional(node: Node): boolean {
     const k = d.getKind();
     if (k === SyntaxKind.ConditionalExpression) found = true;
     if (k === SyntaxKind.BinaryExpression) {
-      const op = (d as import("ts-morph").BinaryExpression).getOperatorToken().getText();
+      const op = (d as BinaryExpression).getOperatorToken().getText();
       if (op === "&&" || op === "||") found = true;
     }
   });
