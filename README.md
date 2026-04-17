@@ -22,6 +22,26 @@ Alternatively, run directly from the repo without linking:
 node /path/to/react-unify/dist/index.js scan ./src
 ```
 
+### Claude Code integration (recommended)
+
+`react-unify` ships with a Claude Code skill at [.claude/skills/react-unify/SKILL.md](.claude/skills/react-unify/SKILL.md). Install it once and Claude Code will invoke the tool automatically whenever you ask things like *"find duplicate components"*, *"what can I deduplicate?"*, or *"scan for refactoring opportunities"*.
+
+Install for your user account (available in every project):
+
+```bash
+# Linux / macOS
+mkdir -p ~/.claude/skills
+cp -r .claude/skills/react-unify ~/.claude/skills/
+
+# Windows (bash)
+mkdir -p "$HOME/.claude/skills"
+cp -r .claude/skills/react-unify "$HOME/.claude/skills/"
+```
+
+Or install for a single project only — copy the `.claude/skills/react-unify` folder into that project's root. Claude Code picks it up from either location.
+
+With the skill installed, you can open Claude Code in any React project and say *"find duplicate components"*. Claude Code will run the scan, read the report, and summarize the top clusters with clickable source links. No need to remember CLI flags.
+
 ## Usage
 
 ```bash
