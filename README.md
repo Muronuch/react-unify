@@ -1,5 +1,8 @@
 # react-unify
 
+[![npm version](https://img.shields.io/npm/v/@muronuch/react-unify.svg)](https://www.npmjs.com/package/@muronuch/react-unify)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A CLI that scans a React/TypeScript codebase, finds structurally similar components by AST shape, and writes a markdown cluster report with clickable `file:///` source links. Designed to pair with Claude Code (or any human reviewer) — the tool surfaces the duplication; you (or Claude Code) decide what to merge.
 
 Optional `--propose` flag adds an LLM step that drafts a unified component per cluster and verifies it compiles via `tsc`. Off by default; you don't need an API key for the core workflow.

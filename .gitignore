@@ -6,3 +6,5 @@ dist/
 react-unify-report.md
 react-unify-report.json
 .vitest-cache/
+docs/
+
