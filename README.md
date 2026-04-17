@@ -22,25 +22,27 @@ If you're already using jscpd / SonarQube / CodeClimate for general duplication 
 ## Install
 
 ```bash
-npm install -g react-unify
+npm install -g @muronuch/react-unify
 # or run without installing:
-npx react-unify scan ./src
+npx @muronuch/react-unify scan ./src
 ```
+
+The CLI binary is `react-unify` (the npm package is scoped because the bare name was taken).
 
 ### Claude Code integration (recommended)
 
 `react-unify` ships with a Claude Code skill. Install it once and Claude Code will invoke the tool whenever you ask *"find duplicate components"*, *"what can I deduplicate?"*, or *"scan for refactoring opportunities"*.
 
-After `npm install -g react-unify`:
+After `npm install -g @muronuch/react-unify`:
 
 ```bash
 # Linux / macOS
 mkdir -p ~/.claude/skills
-cp -r "$(npm root -g)/react-unify/.claude/skills/react-unify" ~/.claude/skills/
+cp -r "$(npm root -g)/@muronuch/react-unify/.claude/skills/react-unify" ~/.claude/skills/
 
 # Windows (bash)
 mkdir -p "$HOME/.claude/skills"
-cp -r "$(npm root -g)/react-unify/.claude/skills/react-unify" "$HOME/.claude/skills/"
+cp -r "$(npm root -g)/@muronuch/react-unify/.claude/skills/react-unify" "$HOME/.claude/skills/"
 ```
 
 Or install per-project: copy the `.claude/skills/react-unify` folder into your project's root. Claude Code picks it up from either location.

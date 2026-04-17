@@ -1,5 +1,5 @@
 {
-  "name": "react-unify",
+  "name": "@muronuch/react-unify",
   "version": "0.1.0",
   "description": "Find structurally similar React components and write a clickable cluster report. Optional LLM proposer drafts the unified component.",
   "type": "module",
