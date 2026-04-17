@@ -1,8 +1,5 @@
 // src/utils/exec.ts
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-
-const exec = promisify(execFile);
+import { spawn } from "node:child_process";
 
 export interface CommandResult {
   ok: boolean;
@@ -11,13 +8,35 @@ export interface CommandResult {
   code: number;
 }
 
-export async function runCommand(cmd: string, args: string[], opts: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): Promise<CommandResult> {
-  const resolved = (cmd === "npx" || cmd === "node" || cmd === "tsc") && process.platform === "win32" ? `${cmd}.cmd` : cmd;
-  try {
-    const { stdout, stderr } = await exec(resolved, args, { cwd: opts.cwd, env: opts.env, maxBuffer: 50 * 1024 * 1024 });
-    return { ok: true, stdout: String(stdout), stderr: String(stderr), code: 0 };
-  } catch (e) {
-    const err = e as { stdout?: string; stderr?: string; code?: number };
-    return { ok: false, stdout: String(err.stdout ?? ""), stderr: String(err.stderr ?? ""), code: typeof err.code === "number" ? err.code : 1 };
-  }
+export function runCommand(cmd: string, args: string[], opts: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): Promise<CommandResult> {
+  // On Windows, .cmd batch files (npx.cmd, tsc.cmd, etc.) cannot be spawned via execFile
+  // without shell:true. We use spawn with shell:true on Windows only so that cmd.exe
+  // can resolve and run the batch wrapper.
+  const useShell = process.platform === "win32";
+  // When using shell on Windows, we pass the bare name (without .cmd) and let cmd.exe resolve it.
+  // When NOT on Windows, use the name as-is.
+  const resolved = cmd;
+
+  return new Promise((resolve) => {
+    const proc = spawn(resolved, args, {
+      cwd: opts.cwd,
+      env: opts.env ?? process.env,
+      shell: useShell,
+      stdio: "pipe",
+      windowsHide: true,
+    });
+
+    let stdout = "";
+    let stderr = "";
+    proc.stdout?.on("data", (chunk: Buffer) => { stdout += String(chunk); });
+    proc.stderr?.on("data", (chunk: Buffer) => { stderr += String(chunk); });
+
+    proc.on("close", (code) => {
+      resolve({ ok: code === 0, stdout, stderr, code: code ?? 1 });
+    });
+
+    proc.on("error", (err) => {
+      resolve({ ok: false, stdout, stderr: stderr + "\n" + String(err), code: 1 });
+    });
+  });
 }
