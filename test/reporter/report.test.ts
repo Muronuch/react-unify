@@ -19,7 +19,7 @@ function desc(name: string, file: string, lines: number): ComponentDescriptor {
     file_path: file, component_name: name, export_type: "named",
     props: [], hooks: [], jsx_tree: [], jsx_depth: 0, jsx_element_count: 0,
     has_state: false, has_effects: false, has_context: false, has_refs: false,
-    imports: [], line_count: lines, source_code: "",
+    imports: [], line_start: 1, line_end: lines, line_count: lines, source_code: "",
   };
 }
 
@@ -39,8 +39,8 @@ describe("buildReport — no proposals", () => {
     expect(report.summary.clusters_found).toBe(1);
     expect(report.summary.mergeable_clusters).toBe(0);
     expect(report.clusters[0]!.components).toEqual([
-      { name: "A", file: "/a.tsx", lines: 30 },
-      { name: "B", file: "/b.tsx", lines: 40 },
+      { name: "A", file: "/a.tsx", line_start: 1, line_end: 30, lines: 30 },
+      { name: "B", file: "/b.tsx", line_start: 1, line_end: 40, lines: 40 },
     ]);
     expect(report.clusters[0]!.proposal).toBeNull();
   });

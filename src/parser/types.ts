@@ -33,6 +33,8 @@ export interface ComponentDescriptor {
   has_context: boolean;
   has_refs: boolean;
   imports: string[];
+  line_start: number;
+  line_end: number;
   line_count: number;
   source_code: string;
 }

@@ -146,7 +146,9 @@ function describeComponent(
   const has_context = hooks.some((h) => h.hook === "useContext");
   const has_refs = hooks.some((h) => h.hook === "useRef" || h.hook === "useImperativeHandle");
   const imports = file.getImportDeclarations().map((d) => d.getModuleSpecifierValue());
-  const line_count = c.hostNode.getEndLineNumber() - c.hostNode.getStartLineNumber() + 1;
+  const line_start = c.hostNode.getStartLineNumber();
+  const line_end = c.hostNode.getEndLineNumber();
+  const line_count = line_end - line_start + 1;
   return {
     file_path: filePath,
     component_name: c.name,
@@ -161,6 +163,8 @@ function describeComponent(
     has_context,
     has_refs,
     imports,
+    line_start,
+    line_end,
     line_count,
     source_code: sourceText,
   };

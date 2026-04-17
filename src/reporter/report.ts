@@ -24,7 +24,7 @@ export interface ProposalSlim {
 export interface ClusterReport {
   cluster_id: number;
   confidence: "high" | "medium" | "low";
-  components: { name: string; file: string; lines: number }[];
+  components: { name: string; file: string; line_start: number; line_end: number; lines: number }[];
   similarity_score: number;
   proposal: ProposalSlim | null;
   verified: boolean;
@@ -50,7 +50,13 @@ export function buildReport(input: BuildReportInput): Report {
   const clusterReports: ClusterReport[] = input.clusters.map((cluster) => {
     const components = cluster.components.map((c) => {
       const d = descByName.get(c.component_name + "|" + c.file_path);
-      return { name: c.component_name, file: c.file_path, lines: d?.line_count ?? 0 };
+      return {
+        name: c.component_name,
+        file: c.file_path,
+        line_start: d?.line_start ?? 0,
+        line_end: d?.line_end ?? 0,
+        lines: d?.line_count ?? 0,
+      };
     });
     const proposal = input.proposals.get(cluster.id) ?? { proposal: null, verified: false, verification_errors: [] };
     return {
@@ -103,7 +109,8 @@ export function renderMarkdown(r: Report): string {
     lines.push("");
     lines.push("**Components:**");
     for (const comp of c.components) {
-      lines.push(`- \`${comp.name}\` — \`${comp.file}\` (${comp.lines} lines)`);
+      const range = comp.line_start && comp.line_end ? `:${comp.line_start}-${comp.line_end}` : "";
+      lines.push(`- \`${comp.name}\` — \`${comp.file}${range}\` (${comp.lines} lines)`);
     }
     lines.push("");
     if (c.proposal) {

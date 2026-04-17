@@ -52,6 +52,9 @@ describe("extractComponents — multiple components per file", () => {
     expect(page.export_type).toBe("default");
     const header = components.find((c) => c.component_name === "Header")!;
     expect(header.line_count).toBeLessThan(page.line_count);
+    expect(header.line_start).toBeGreaterThan(0);
+    expect(header.line_end).toBeGreaterThanOrEqual(header.line_start);
+    expect(page.line_start).toBeGreaterThan(header.line_end);
   });
 });
 
