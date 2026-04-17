@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.log
+.env
+.env.local
+react-unify-report.md
+react-unify-report.json
+.vitest-cache/
