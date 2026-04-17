@@ -63,8 +63,71 @@ export function similarity(a: ComponentFingerprint, b: ComponentFingerprint): nu
 }
 
 export function clusterComponents(
-  _fps: ComponentFingerprint[],
-  _threshold = 0.6
+  fps: ComponentFingerprint[],
+  threshold = 0.6
 ): ComponentCluster[] {
-  throw new Error("not implemented");
+  if (fps.length < 2) return [];
+
+  // Pairwise similarity matrix
+  const n = fps.length;
+  const sim: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const s = similarity(fps[i]!, fps[j]!);
+      sim[i]![j] = s;
+      sim[j]![i] = s;
+    }
+  }
+
+  // Each cluster starts as a singleton index list
+  let clusters: number[][] = fps.map((_, i) => [i]);
+
+  function avgLink(a: number[], b: number[]): number {
+    let sum = 0;
+    let count = 0;
+    for (const i of a) for (const j of b) { sum += sim[i]![j]!; count++; }
+    return count === 0 ? 0 : sum / count;
+  }
+
+  while (true) {
+    let bestI = -1;
+    let bestJ = -1;
+    let bestS = -1;
+    for (let i = 0; i < clusters.length; i++) {
+      for (let j = i + 1; j < clusters.length; j++) {
+        const s = avgLink(clusters[i]!, clusters[j]!);
+        if (s > bestS) { bestS = s; bestI = i; bestJ = j; }
+      }
+    }
+    if (bestS < threshold || bestI === -1) break;
+    const merged = [...clusters[bestI]!, ...clusters[bestJ]!];
+    clusters = clusters.filter((_, idx) => idx !== bestI && idx !== bestJ);
+    clusters.push(merged);
+  }
+
+  // Drop singletons, score, sort
+  const out: ComponentCluster[] = [];
+  for (const cl of clusters) {
+    if (cl.length < 2) continue;
+    let sum = 0;
+    let count = 0;
+    for (let i = 0; i < cl.length; i++) {
+      for (let j = i + 1; j < cl.length; j++) {
+        sum += sim[cl[i]!]![cl[j]!]!;
+        count++;
+      }
+    }
+    const avg = count === 0 ? 0 : sum / count;
+    const components = cl.map((i) => fps[i]!);
+    const sameCategory = components.every((c) => c.category === components[0]!.category);
+    let confidence: MergeConfidence;
+    if (avg >= 0.8 && sameCategory) confidence = "high";
+    else if (avg >= 0.65) confidence = "medium";
+    else confidence = "low";
+    out.push({ id: 0, components, similarity_score: avg, merge_confidence: confidence });
+  }
+
+  out.sort((a, b) => b.components.length - a.components.length || b.similarity_score - a.similarity_score);
+  out.forEach((c, idx) => { c.id = idx + 1; });
+  return out;
 }
