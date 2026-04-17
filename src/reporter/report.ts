@@ -109,8 +109,10 @@ export function renderMarkdown(r: Report): string {
     lines.push("");
     lines.push("**Components:**");
     for (const comp of c.components) {
-      const range = comp.line_start && comp.line_end ? `:${comp.line_start}-${comp.line_end}` : "";
-      lines.push(`- \`${comp.name}\` — \`${comp.file}${range}\` (${comp.lines} lines)`);
+      const href = encodeURI(comp.file);
+      const anchor = comp.line_start && comp.line_end ? `#L${comp.line_start}-L${comp.line_end}` : "";
+      const rangeLabel = comp.line_start && comp.line_end ? ` L${comp.line_start}-${comp.line_end}` : "";
+      lines.push(`- [\`${comp.name}\`](${href}${anchor}) — ${comp.lines} lines${rangeLabel}`);
     }
     lines.push("");
     if (c.proposal) {

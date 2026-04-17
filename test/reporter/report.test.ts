@@ -61,8 +61,8 @@ describe("renderMarkdown / renderJson", () => {
     const md = renderMarkdown(report);
     expect(md).toContain("# react-unify Report");
     expect(md).toContain("Cluster 1");
-    expect(md).toContain("A");
-    expect(md).toContain("B");
+    expect(md).toContain("[`A`](/a.tsx#L1-L30)");
+    expect(md).toContain("[`B`](/b.tsx#L1-L40)");
     const json = renderJson(report);
     expect(JSON.parse(json).summary.total_components_scanned).toBe(5);
   });
