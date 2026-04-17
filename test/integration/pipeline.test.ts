@@ -4,7 +4,7 @@ import path from "node:path";
 import { extractComponents } from "../../src/parser/extract.js";
 import { generateFingerprint } from "../../src/analyzer/fingerprint.js";
 import { clusterComponents } from "../../src/clusterer/cluster.js";
-import { proposeUnification } from "../../src/proposer/propose.js";
+import { proposeUnification, toSlim } from "../../src/proposer/propose.js";
 import { MockLLMClient } from "../../src/proposer/llm-client.js";
 import { buildReport, renderMarkdown } from "../../src/reporter/report.js";
 
@@ -17,12 +17,20 @@ describe("integration: dry-run pipeline on sample-project", () => {
     const fps = descriptors.map(generateFingerprint);
     const clusters = clusterComponents(fps, 0.6);
 
-    const names = (cl: typeof clusters[0]) => cl.components.map((c) => c.component_name).sort();
-    const allClustered = clusters.flatMap(names);
+    // Fix 15: assert each family is in its own cluster, not just "somewhere" in the output
+    const cardCluster = clusters.find((c) => c.components.every((x) => /Card$/.test(x.component_name)));
+    expect(cardCluster).toBeDefined();
+    expect(cardCluster!.components).toHaveLength(3);
+    const cardNames = cardCluster!.components.map((c) => c.component_name).sort();
+    expect(cardNames).toEqual(["ProductCard", "TeamCard", "UserCard"]);
 
-    expect(allClustered).toEqual(expect.arrayContaining(["UserCard", "ProductCard", "TeamCard"]));
-    expect(allClustered).toEqual(expect.arrayContaining(["UserList", "ProductList"]));
-    expect(allClustered).toEqual(expect.arrayContaining(["LoginForm", "SignupForm", "ContactForm"]));
+    const formCluster = clusters.find((c) => c.components.every((x) => /Form$/.test(x.component_name)));
+    expect(formCluster).toBeDefined();
+    expect(formCluster!.components).toHaveLength(3);
+
+    const listCluster = clusters.find((c) => c.components.every((x) => /List$/.test(x.component_name)));
+    expect(listCluster).toBeDefined();
+    expect(listCluster!.components).toHaveLength(2);
 
     expect(clusters.length).toBeGreaterThanOrEqual(2);
   });
@@ -52,13 +60,9 @@ export const X${i} = () => <ItemCard title="x" />;
     expect(proposal).not.toBeNull();
 
     const proposals = new Map();
+    // Fix 4: use toSlim() instead of manual mapping
     proposals.set(cardCluster.id, {
-      proposal: {
-        generic_name: proposal!.generic_component.name,
-        generic_source: proposal!.generic_component.source,
-        rewrites: proposal!.rewrites.map((r) => ({ original: r.original_path, rewrite: r.rewrite_source })),
-        lines_saved: proposal!.savings,
-      },
+      proposal: toSlim(proposal!),
       verified: false,
       verification_errors: [],
     });
