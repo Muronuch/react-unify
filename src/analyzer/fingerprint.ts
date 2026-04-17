@@ -30,6 +30,36 @@ export interface ComponentFingerprint {
   category: CategoryName;
 }
 
-export function generateFingerprint(_d: ComponentDescriptor): ComponentFingerprint {
-  throw new Error("not implemented");
+export function generateFingerprint(d: ComponentDescriptor): ComponentFingerprint {
+  const prop_types_sorted = [...d.props.map((p) => p.type)].sort();
+  const hook_names_sorted = [...d.hooks.map((h) => h.hook)].sort();
+  const jsx_tag_bag = [...d.jsx_tree.map((n) => n.tag)].sort();
+  const has_list_rendering = d.jsx_tree.some((n) => n.has_map);
+  const has_conditional_rendering = d.jsx_tree.some((n) => n.has_conditional);
+  const fetchHookNames = ["useQuery", "useSWR", "useMutation", "useFetch"];
+  const has_data_fetching =
+    d.hooks.some((h) => fetchHookNames.includes(h.hook)) ||
+    d.imports.some((m) => m === "axios" || m.includes("react-query") || m.includes("@tanstack/react-query") || m.includes("swr")) ||
+    /\bfetch\s*\(/.test(d.source_code);
+  const has_form =
+    d.hooks.some((h) => h.hook === "useForm") ||
+    d.jsx_tree.some((n) => n.tag === "form") ||
+    d.jsx_tree.filter((n) => n.tag === "input" || n.tag === "select" || n.tag === "textarea").length >= 2;
+  return {
+    component_name: d.component_name,
+    file_path: d.file_path,
+    prop_count: d.props.length,
+    prop_types_sorted,
+    hook_names_sorted,
+    jsx_tag_bag,
+    jsx_depth: d.jsx_depth,
+    jsx_element_count: d.jsx_element_count,
+    has_list_rendering,
+    has_conditional_rendering,
+    has_state: d.has_state,
+    has_effects: d.has_effects,
+    has_data_fetching,
+    has_form,
+    category: "other",
+  };
 }
