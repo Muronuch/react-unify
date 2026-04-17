@@ -9,6 +9,7 @@ import { extractComponents } from "./parser/extract.js";
 import { generateFingerprint } from "./analyzer/fingerprint.js";
 import { clusterComponents } from "./clusterer/cluster.js";
 import { buildReport, renderMarkdown, renderJson, renderConsoleSummary } from "./reporter/report.js";
+import type { ProposalSlim } from "./reporter/report.js";
 import { loadConfig } from "./utils/config.js";
 import { writeText } from "./utils/fs.js";
 
@@ -80,8 +81,41 @@ program
       return;
     }
 
-    // Slice B will plug in here.
-    console.log(chalk.yellow("Non-dry-run is not yet wired (will be added in Slice B)"));
+    if (!config.api_key) {
+      console.error(chalk.red("No API key found. Set ANTHROPIC_API_KEY (or pass --dry-run)."));
+      process.exit(1);
+    }
+    const { createClient } = await import("./proposer/llm-client.js");
+    const { proposeUnification } = await import("./proposer/propose.js");
+    const llm = createClient(config.llm_provider, config.api_key, config.llm_model);
+
+    const proposals = new Map<number, { proposal: ProposalSlim | null; verified: boolean; verification_errors: string[] }>();
+    for (const cluster of clusters) {
+      const sp = ora(`Proposing unified component for cluster ${cluster.id}…`).start();
+      const proposal = await proposeUnification(cluster, descriptors, llm, { maxRetries: config.max_retries, model: config.llm_model });
+      if (!proposal) {
+        sp.warn(chalk.yellow(`Cluster ${cluster.id}: LLM did not return a usable proposal`));
+        proposals.set(cluster.id, { proposal: null, verified: false, verification_errors: ["LLM proposal failed"] });
+        continue;
+      }
+      sp.succeed(chalk.green(`Cluster ${cluster.id}: ${proposal.generic_component.name} (saves ${proposal.savings} lines)`));
+      proposals.set(cluster.id, {
+        proposal: {
+          generic_name: proposal.generic_component.name,
+          generic_source: proposal.generic_component.source,
+          rewrites: proposal.rewrites.map((r) => ({ original: r.original_path, rewrite: r.rewrite_source })),
+          lines_saved: proposal.savings,
+        },
+        verified: false,
+        verification_errors: [],
+      });
+    }
+
+    const report = buildReport({ scanned_count: descriptors.length, clusters, descriptors, proposals });
+    const out = config.output_format === "json" ? renderJson(report) : renderMarkdown(report);
+    writeText(config.output_path, out);
+    console.log(chalk.cyan(renderConsoleSummary(report)));
+    console.log(chalk.gray(`Report written to ${config.output_path}`));
   });
 
 const isMain = import.meta.url === `file://${process.argv[1]?.replace(/\\/g, "/")}` ||
